@@ -1,0 +1,281 @@
+% CFF Dump Output
+% File: simple.cff
+
+
+--------------------------------------------------------------------------------
+
+Header (0x00000000):
+    major: 1
+    minor: 0
+    hdrSize: 4
+    offSize: 4
+
+--------------------------------------------------------------------------------
+
+Name INDEX (0x00000004):
+  count: 1, offSize: 1
+    [0]: (SerifFont-Regular)
+
+--------------------------------------------------------------------------------
+
+Top DICT INDEX (0x0000001a):
+  count: 1, offSize: 2
+  [0] (0x00000021):
+  <<
+    /version (001.000)  % SID 379
+    /Notice (Copyright (c) 2020)  % SID 391
+    /FullName (Serif Font Regular)  % SID 392
+    /FamilyName (Serif Font)  % SID 393
+    /Weight (Regular)  % SID 388
+    /FontBBox [5 -15 662 749]
+    /charset 133  % offset
+    /Encoding 152  % offset
+    /CharStrings 163  % offset
+    /Private [53 952]  % [size offset]
+    % ----- Following entries are missing, so they get default values: -----
+    /isFixedPitch false  % default
+    /ItalicAngle 0  % default
+    /UnderlinePosition -100  % default
+    /UnderlineThickness 50  % default
+    /PaintType 0  % default
+    /CharstringType 2  % default
+    /FontMatrix [0.001 0 0 0.001 0 0]  % default
+    /StrokeWidth 0  % default
+  >>
+
+--------------------------------------------------------------------------------
+
+String INDEX (0x0000004a):
+  count: 3, offSize: 2
+    [0](SID = 391): (Copyright (c) 2020)
+    [1](SID = 392): (Serif Font Regular)
+    [2](SID = 393): (Serif Font)
+
+--------------------------------------------------------------------------------
+
+Global Subr INDEX (0x00000083):
+  count: 0
+  <No global subroutines>
+
+--------------------------------------------------------------------------------
+
+Encoding (0x00000098):
+  (format 0; 9 codes; <code> = <glyphName>)
+  65  = /A,          68  = /D,          97  = /a,          98  = /b,          
+  99  = /c,          101 = /e,          102 = /f,          168 = /dieresis,   
+  228 = /adieresis,  
+
+--------------------------------------------------------------------------------
+
+Charset (0x00000085):
+  (format 0; [GID] = <glyphName>):
+  ([0] = /.notdef),
+  [1]  = /A,         [2]  = /D,         [3]  = /a,         [4]  = /b,         
+  [5]  = /c,         [6]  = /e,         [7]  = /f,         [8]  = /dieresis,  
+  [9]  = /adieresis, 
+
+--------------------------------------------------------------------------------
+
+CharStrings INDEX (0x000000a3):
+  count: 10, offSize: 2
+  ([GID] <glyphName> (offset): <charstring>)
+  [0] /.notdef (0x000000bc):
+    119 0 50 433 50 hstem  % glyph width = 119 + nominalWidthX = 500
+    50 50 300 50 vstem
+    50 hmoveto
+    400 533 -400 hlineto
+    50 -483 rmoveto
+    433 300 -433 vlineto
+    endchar
+  [1] /A (0x000000df):
+    283 0 47 171 47 404 -20 hstemhm  % glyph width = 283 + nominalWidthX = 664
+    5 230 -230 649 hintmask 0xE8 
+    210 265 rmoveto
+    100 289 98 -289 rlineto
+    171 -215 rmoveto
+    -215 619 -60 0 rlineto
+    hintmask 0xF0 
+    -214 -615 -85 -13 0 -41 230 0 0 41 -97 13 56 164 230 0 56 -165 -98 -12 0 -41 272 0 0 41 rlineto
+    endchar
+  [2] /D (0x00000130):
+    328 0 47 575 47 hstem  % glyph width = 328 + nominalWidthX = 709
+    138 94 321 109 vstem
+    234 47 rmoveto
+    -2 88 0 89 0 98 rrcurveto
+    37 vlineto
+    0 89 0 88 2 86 rrcurveto
+    88 hlineto
+    139 92 -100 -188 -187 -92 -100 -138 hvcurveto
+    -279 622 rmoveto
+    0 -41 92 -11 rlineto
+    2 -86 0 -86 0 -86 rrcurveto
+    -37 vlineto
+    0 -97 0 -88 -2 -85 rrcurveto
+    -92 -11 0 -41 276 0 rlineto
+    188 154 118 217 216 -138 118 -184 hvcurveto
+    endchar
+  [3] /a (0x00000197):
+    -15 66 -61 52 403 46 hstemhm  % glyph width = defaultWidthX = 510
+    46 89 189 85 hintmask 0xB8 
+    324 105 rmoveto
+    -107 callsubr  % subr# 0
+    hintmask 0x78 
+    160 -194 rmoveto
+    -106 callsubr  % subr# 1
+    hintmask 0xB8 
+    -105 callsubr  % subr# 2
+    hintmask 0x78 
+    -104 callsubr  % subr# 3
+    endchar
+  [4] /b (0x000001be):
+    196 -15 57 -31 -21 0 60 -29 -21 434 57 238 -20 hstemhm  % glyph width = 196 + nominalWidthX = 577
+    107 84 251 90 hintmask 0x8F 
+    191 376 rmoveto
+    54 45 39 13 31 0 rrcurveto
+    76 51 -72 -128 -129 -61 -63 -71 hvcurveto
+    -37 0 -41 17 -41 39 rrcurveto
+    -3 481 rmoveto
+    4 142 -14 8 -153 -45 0 -35 82 -10 0 -429 rlineto
+    hintmask 0x2F 
+    0 -44 -1 -66 -1 -50 rrcurveto
+    hintmask 0x1F 
+    -75 -14 0 -36 rlineto
+    hintmask 0x4F 
+    151 -10 rlineto
+    hintmask 0x8F 
+    6 58 8 0 rlineto
+    41 -47 45 -16 46 0 rrcurveto
+    117 88 103 154 155 -84 94 -106 hvcurveto
+    -55 0 -52 -24 -47 -53 rrcurveto
+    endchar
+  [5] /c (0x00000240):
+    107 -15 64 396 46 hstem  % glyph width = 107 + nominalWidthX = 488
+    47 88 vstem
+    433 127 rmoveto
+    -31 -50 -50 -28 -57 0 rrcurveto
+    -94 -66 70 127 128 62 71 86 hvcurveto
+    16 0 19 -2 19 -6 rrcurveto
+    18 -66 rlineto
+    6 -28 15 -20 33 0 26 0 15 12 5 26 -12 74 -74 56 -91 0 rrcurveto
+    -120 -111 -97 -158 -153 87 -98 137 hvcurveto
+    95 0 65 46 27 83 rrcurveto
+    endchar
+  [6] /e (0x00000294):
+    -15 64 193 43 160 46 hstem  % glyph width = defaultWidthX = 510
+    47 90 244 83 vstem
+    139 285 rmoveto
+    11 116 66 44 57 0 rrcurveto
+    61 47 -51 -57 -29 -12 -23 -48 hvcurveto
+    136 -43 rmoveto
+    4 14 3 19 0 23 rrcurveto
+    121 -82 72 -105 -126 -104 -106 -152 -153 88 -95 135 vhcurveto
+    91 0 66 45 35 72 rrcurveto
+    -24 19 rlineto
+    -36 -43 -39 -29 -64 0 -96 0 -64 70 -2 123 rrcurveto
+    endchar
+  [7] /f (0x000002ef):
+    -27 0 36 384 53 -53 55 175 99 hstemhm  % glyph width = -27 + nominalWidthX = 354
+    117 85 hintmask 0xB8 
+    35 464 rmoveto
+    hintmask 0xD8 
+    -44 82 -210 vlineto
+    0 -53 -1 -54 -1 -53 rrcurveto
+    -79 -14 0 -36 257 0 0 36 -89 15 rlineto
+    -1 53 -1 53 0 53 rrcurveto
+    210 135 53 -137 vlineto
+    -2 96 15 57 21 35 10 18 12 13 12 9 rrcurveto
+    25 -20 rlineto
+    25 -20 22 -11 25 0 36 0 23 20 2 26 -10 38 -39 15 -48 0 -45 0 -52 -14 -43 -47 rrcurveto
+    hintmask 0xB8 
+    -43 -46 -18 -60 -10 -107 rrcurveto
+    endchar
+  [8] /dieresis (0x00000360):
+    19 587 109 hstem  % glyph width = 19 + nominalWidthX = 400
+    42 115 86 115 vstem
+    301 587 rmoveto
+    -103 callsubr  % subr# 4
+    -202 hmoveto
+    -102 callsubr  % subr# 5
+    endchar
+  [9] /adieresis (0x0000037a):
+    -15 66 -61 52 403 46 60 109 hstemhm  % glyph width = defaultWidthX = 510
+    46 89 -39 115 86 115 -88 85 hintmask 0x16 
+    355 551 rmoveto
+    -103 callsubr  % subr# 4
+    -202 hmoveto
+    -102 callsubr  % subr# 5
+    hintmask 0xA9 
+    171 -446 rmoveto
+    -107 callsubr  % subr# 0
+    hintmask 0x69 
+    160 -194 rmoveto
+    -106 callsubr  % subr# 1
+    hintmask 0xA9 
+    -105 callsubr  % subr# 2
+    hintmask 0x69 
+    -104 callsubr  % subr# 3
+    endchar
+
+--------------------------------------------------------------------------------
+
+Private DICT (0x000003b8):
+  <<
+    /defaultWidthX 510
+    /nominalWidthX 381
+    /BlueValues [-15 0 491 491 669 669 729 749]  % Original delta values: [-15 15 491 0 178 0 60 20]
+    /BlueShift 0
+    /StdHW 47
+    /StemSnapH [36 43 47 53 57 64 99 109]  % Original delta values: [36 7 4 6 4 7 35 10]
+    /StdVW 84
+    /StemSnapV [83 84 85 88 89 90 94 109 115 230 649]  % Original delta values: [83 1 1 3 1 1 4 15 6 115 419]
+    /Subrs 53  % offset to Local Subr INDEX (relative to start of Private DICT)
+    % ----- Following entries are missing, so they get default values: -----
+    /BlueScale 0.039625  % default
+    /BlueFuzz 1  % default
+    /ForceBold false  % default
+    /LanguageGroup 0  % default
+    /ExpansionFactor 0.06  % default
+    /initialRandomSeed 0  % default
+  >>
+
+--------------------------------------------------------------------------------
+
+Local Subr INDEX (0x000003ed):
+  count: 6, offSize: 1, subroutine bias: 107
+  [0] (0x000003f7):
+    -56 -41 -20 -13 -33 0 -24 0 -21 7 -16 16 -11 12 -8 15 0 26 0 30 10 39 88 34 21 8 35 12 35 9 rrcurveto
+    return
+  [1] (0x00000417):
+    -5 -6 rlineto
+    -9 -8 -12 -9 -16 0 rrcurveto
+    -22 -11 19 40 hvcurveto
+    214 vlineto
+    128 -50 48 -105 vhcurveto
+    -102 0 -75 -50 -18 -76 3 -26 16 -17 28 0 27 0 18 17 9 31 rrcurveto
+    20 70 rlineto
+    20 4 17 1 14 0 rrcurveto
+    66 27 -24 -97 hvcurveto
+    -27 vlineto
+    -40 -10 -41 -12 -31 -11 -136 -49 -30 -47 0 -57 rrcurveto
+    return
+  [2] (0x00000462):
+    -82 61 -44 73 vhcurveto
+    59 0 34 27 53 53 rrcurveto
+    return
+  [3] (0x0000046f):
+    9 -45 32 -30 56 0 32 0 26 11 23 42 rrcurveto
+    return
+  [4] (0x0000047d):
+    32 25 23 31 32 -25 23 -32 -31 -27 -23 -32 -31 27 -23 31 hvcurveto
+    return
+  [5] (0x0000048f):
+    31 27 23 31 32 -27 23 -31 -32 -25 -23 -32 -31 25 -23 32 hvcurveto
+    return
+
+--------------------------------------------------------------------------------
+
+Info messages:
+<None>
+
+% End of dump
+
