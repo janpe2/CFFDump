@@ -960,7 +960,7 @@ public class CFFDump
         }
 
         for (int lsubrNo = 0; lsubrNo < count; lsubrNo++) {
-            String lsubr = localSubrs.get(lsubrNo);
+            String lsubr = (lsubrNo < localSubrs.size()) ? localSubrs.get(lsubrNo) : null;
             if (lsubr == null) {
                 int[] offLen = getOffsetAndLengthOfSubroutine(lsubrNo, true, fdIdx);
                 sbMain.append("  [").append(lsubrNo).append("] ");
