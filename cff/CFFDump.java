@@ -1910,7 +1910,7 @@ public class CFFDump
             this.charsetArray = charset;
         }
 
-        encodingDump = parseEncoding(fontDict, charset);
+        encodingDump = parseEncoding(fontDict, charset, numGlyphs);
 
         localSubrDumps.add(new ArrayList<String>());
         loadPrivateDict(fontDict, "Private DICT", true, 0);
@@ -2157,7 +2157,7 @@ public class CFFDump
         return names;
     }
 
-    private String parseEncoding(HashMap<String,String> fontDict, String[] charset)
+    private String parseEncoding(HashMap<String,String> fontDict, String[] charset, int numGlyphs)
     throws CFFParseException
     {
         // OpenType-CFF files (.otf) typically omit the Encoding entry in their
@@ -2185,6 +2185,7 @@ public class CFFDump
         // Length of codes as strings. Codes are stored as Card8 values, so the
         // largest code is 255.
         int maxCodeLength = getLengthAsString(255);
+        int maxGIDLength = getLengthAsString(numGlyphs - 1);
         // Length of glyph names
         int maxGlyphNameLength = 0;
         for (String glyphName : charset) {
@@ -2193,9 +2194,9 @@ public class CFFDump
         maxGlyphNameLength += 1; // "/"
 
         if (format == 0) {
-            parseEncodingFormat0(charset, s, maxCodeLength, maxGlyphNameLength);
+            parseEncodingFormat0(charset, s, maxCodeLength, maxGlyphNameLength, maxGIDLength);
         } else if (format == 1) {
-            parseEncodingFormat1(charset, s, maxCodeLength, maxGlyphNameLength);
+            parseEncodingFormat1(charset, s, maxCodeLength, maxGlyphNameLength, maxGIDLength);
         } else {
             throw new CFFParseException("Invalid CFF Encoding format " + format);
         }
@@ -2210,11 +2211,11 @@ public class CFFDump
     }
 
     private void parseEncodingFormat0(String[] charset, StringBuilder s,
-    int maxCodeLength, int maxGlyphNameLength)
+    int maxCodeLength, int maxGlyphNameLength, int maxGIDLength)
     {
         int nCodes = readCard8();
 
-        s.append("(format 0; ").append(nCodes).append(" codes; <code> = <glyphName>)\n  ");
+        s.append("(format 0; ").append(nCodes).append(" codes; <code> = <[GID]> = <glyphName>)\n  ");
 
         int gid = 1; // encoding starts from GID 1
         final int numColumns = 4;
@@ -2225,6 +2226,8 @@ public class CFFDump
             String glyphName = arrayGet(charset, gid);
 
             printPadded(Integer.toString(code), -1, s, maxCodeLength);
+            s.append(" = [");
+            printPadded(Integer.toString(gid), ']', s, maxGIDLength);
             s.append(" = /");
             printPadded(glyphName, ',', s, maxGlyphNameLength);
             s.append(' ');
@@ -2238,11 +2241,11 @@ public class CFFDump
     }
 
     private void parseEncodingFormat1(String[] charset, StringBuilder s,
-    int maxCodeLength, int maxGlyphNameLength)
+    int maxCodeLength, int maxGlyphNameLength, int maxGIDLength)
     {
         int nRanges = readCard8();
 
-        s.append("(format 1; ").append(nRanges).append(" ranges; <code> = <glyphName>)\n  ");
+        s.append("(format 1; ").append(nRanges).append(" ranges; <code> = <[GID]> = <glyphName>)\n  ");
 
         int gid = 1; // encoding starts from GID 1
         final int numColumns = 4;
@@ -2256,6 +2259,8 @@ public class CFFDump
                 String glyphName = arrayGet(charset, gid);
 
                 printPadded(Integer.toString(code), -1, s, maxCodeLength);
+                s.append(" = [");
+                printPadded(Integer.toString(gid), ']', s, maxGIDLength);
                 s.append(" = /");
                 printPadded(glyphName, ',', s, maxGlyphNameLength);
                 s.append(' ');
@@ -2274,9 +2279,9 @@ public class CFFDump
     private void parseSupplementalEncoding(StringBuilder s,
     int maxCodeLength, int maxGlyphNameLength)
     {
-        s.append("\n\nSupplemental encodings (<code> = <glyphName>):\n  ");
-
         int nSups = readCard8();
+        s.append("\n\nSupplemental encodings (").append(nSups);
+        s.append(" mappings; <code> = <glyphName>):\n  ");
 
         final int numColumns = 4;
         int columnCounter = 0;
