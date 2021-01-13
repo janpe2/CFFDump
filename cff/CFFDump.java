@@ -334,7 +334,7 @@ public class CFFDump
         KEY_UNDERLINEPOSITION  = "UnderlinePosition",
         KEY_UNDERLINETHICKNESS = "UnderlineThickness",
         KEY_PAINTTYPE          = "PaintType",
-        KEY_CHARSTRINGTYPE     = "CharStringType",
+        KEY_CHARSTRINGTYPE     = "CharstringType",
         KEY_FONTMATRIX         = "FontMatrix",
         KEY_STROKEWIDTH        = "StrokeWidth",
         KEY_FORCEBOLD          = "ForceBold",
@@ -1275,30 +1275,30 @@ public class CFFDump
         }
 
         // Note: Instance variable isCIDFont is still uninitialized.
-        boolean isCID = d.containsKey("ROS");
+        boolean isCID = d.containsKey(KEY_ROS);
         s.append("    % ----- Following entries are missing, so they get default values: -----\n");
 
         switch (dictType) {
             case DICT_TYPE_TOP:
             case DICT_TYPE_FD:
-                printMissingEntry("isFixedPitch", "false", d, s);
-                printMissingEntry("ItalicAngle", "0", d, s);
-                printMissingEntry("UnderlinePosition", "-100", d, s);
-                printMissingEntry("UnderlineThickness", "50", d, s);
-                printMissingEntry("PaintType", "0", d, s);
-                printMissingEntry("CharstringType", "2", d, s);
-                printMissingEntry("FontMatrix", "[0.001 0 0 0.001 0 0]", d, s);
-                printMissingEntry("FontBBox", "[0 0 0 0]", d, s);
-                printMissingEntry("StrokeWidth", "0", d, s);
+                printMissingEntry(KEY_ISFIXEDPITCH, "false", d, s);
+                printMissingEntry(KEY_ITALICANGLE, "0", d, s);
+                printMissingEntry(KEY_UNDERLINEPOSITION, "-100", d, s);
+                printMissingEntry(KEY_UNDERLINETHICKNESS, "50", d, s);
+                printMissingEntry(KEY_PAINTTYPE, "0", d, s);
+                printMissingEntry(KEY_CHARSTRINGTYPE, "2", d, s);
+                printMissingEntry(KEY_FONTMATRIX, "[0.001 0 0 0.001 0 0]", d, s);
+                printMissingEntry(KEY_FONTBBOX, "[0 0 0 0]", d, s);
+                printMissingEntry(KEY_STROKEWIDTH, "0", d, s);
                 if (dictType == DICT_TYPE_TOP) {
                     if (isCID) {
-                        printMissingEntry("CIDFontVersion", "0", d, s);
-                        printMissingEntry("CIDFontRevision", "0", d, s);
-                        printMissingEntry("CIDFontType", "0", d, s);
-                        printMissingEntry("CIDCount", "8720", d, s);
+                        printMissingEntry(KEY_CIDFONTVERSION, "0", d, s);
+                        printMissingEntry(KEY_CIDFONTREVISION, "0", d, s);
+                        printMissingEntry(KEY_CIDFONTTYPE, "0", d, s);
+                        printMissingEntry(KEY_CIDCOUNT, "8720", d, s);
                     } else {
-                        printMissingEntry("charset", "/ISOAdobe", d, s);
-                        printMissingEntry("Encoding", "/StandardEncoding", d, s);
+                        printMissingEntry(KEY_CHARSET, "/ISOAdobe", d, s);
+                        printMissingEntry(KEY_ENCODING_OFFSET, "/StandardEncoding", d, s);
                     }
                 }
                 break;
@@ -1306,12 +1306,12 @@ public class CFFDump
                 printMissingEntry(KEY_BLUESCALE, "0.039625", d, s);
                 printMissingEntry(KEY_BLUESHIFT, "7", d, s);
                 printMissingEntry(KEY_BLUEFUZZ, "1", d, s);
-                printMissingEntry("ForceBold", "false", d, s);
+                printMissingEntry(KEY_FORCEBOLD, "false", d, s);
                 printMissingEntry(KEY_LANGUAGEGROUP, "0", d, s);
                 printMissingEntry(KEY_EXPANSIONFACTOR, "0.06", d, s);
                 printMissingEntry(KEY_INITIALRANDOMSEED, "0", d, s);
-                printMissingEntry("defaultWidthX", "0", d, s);
-                printMissingEntry("nominalWidthX", "0", d, s);
+                printMissingEntry(KEY_DEFAULTWIDTHX, "0", d, s);
+                printMissingEntry(KEY_NOMINALWIDTHX, "0", d, s);
                 break;
         }
 
