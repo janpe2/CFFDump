@@ -1,4 +1,4 @@
-/* Copyright 2020 Jani Pehkonen
+/* Copyright 2021 Jani Pehkonen
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Stack;
 import java.util.TreeMap;
 import java.util.zip.InflaterInputStream;
+import cff.gui.CFFDumpFrame;
 
 /**
  * Reads CFF (Compact Font Format) data and dumps it in ASCII form.
@@ -448,6 +449,7 @@ public class CFFDump
         String file = null;
         boolean isOpenType = false;
         boolean enableCharstringsDump = false;
+        boolean isGUI = false;
         int filter = FILTER_NONE;
         int startOffset = 0;
         String singleGlyph = null;
@@ -478,6 +480,8 @@ public class CFFDump
                 filter = FILTER_ASCII_HEX;
             } else if (arg.equals("-c")) {
                 enableCharstringsDump = true;
+            } else if (arg.equals("-gui") || arg.equals("gui")) {
+                isGUI = true;
             } else if (file == null) {
                 file = args[i];
             } else {
@@ -485,6 +489,10 @@ public class CFFDump
             }
         }
 
+        if (isGUI) {
+            CFFDumpFrame.launchGUI();
+            return;
+        }
         if (file == null) {
             printUsage();
         }
@@ -519,6 +527,7 @@ public class CFFDump
             "  -deflate         Input data is compressed by deflate.\n" +
             "  -hex             Input data is ASCII hex encoded.\n" +
             "  -c               Enable dump of all charstrings and subroutines.\n" +
+            "  -gui             Use graphical user interface.\n" +
             "  -start <offset>  Start offset of input data. Default: 0.\n" +
             "  -g <id>          Dump only the charstring of the specified glyph.\n" +
             "                   <id> is a glyph index (e.g. 25), a glyph name\n" +
