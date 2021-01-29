@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
-import java.util.TreeMap;
 import java.util.zip.InflaterInputStream;
 import cff.gui.CFFDumpFrame;
 
@@ -83,7 +82,7 @@ public class CFFDump
     private int unusedGlobalSubrs = 0;
     private int unusedLocalSubrs = 0;
     private static final int NO_DEFAULT = Integer.MIN_VALUE;
-    private static final boolean ENABLE_PRINTING_OFFSET_ARRAYS = false;
+    private boolean enablePrintingOffsetArrays;
     private final float[] type2Stack = new float[48];
     private int type2StackCount;
     private float[] transientArray = null; // initialized on first use
@@ -209,6 +208,8 @@ public class CFFDump
      * Dictionary type: Font DICT in a Font DICT INDEX (a.k.a. FDArray).
      */
     private static final int DICT_TYPE_FD = 4;
+
+    private static final int OTF_OTTO = 0x4F54544F;
 
     /**
      * Predefined standard strings for SIDs 0...390.
@@ -450,6 +451,7 @@ public class CFFDump
         boolean isOpenType = false;
         boolean enableCharstringsDump = false;
         boolean isGUI = false;
+        boolean enableOffsetsDump = false;
         int filter = FILTER_NONE;
         int startOffset = 0;
         String singleGlyph = null;
@@ -482,6 +484,8 @@ public class CFFDump
                 enableCharstringsDump = true;
             } else if (arg.equals("-gui") || arg.equals("gui")) {
                 isGUI = true;
+            } else if (arg.equals("-offsets")) {
+                enableOffsetsDump = true;
             } else if (file == null) {
                 file = args[i];
             } else {
@@ -510,11 +514,18 @@ public class CFFDump
         }
 
         dumper.enableDumpingCharstringsAndSubrs(enableCharstringsDump);
+        dumper.enableDumpingOffsetArrays(enableOffsetsDump);
         if (singleGlyph != null) {
             dumper.dumpOnlyOneCharstring(singleGlyph);
         }
+
         dumper.parseCFF();
-        System.out.println(dumper.getResult());
+
+        String dump = dumper.getResult();
+        if (dumper.hasErrors()) {
+            dump += "\nThere we errors:\n" + dumper.getErrors();
+        }
+        System.out.println(dump);
     }
 
     private static void printUsage()
@@ -532,6 +543,7 @@ public class CFFDump
             "  -g <id>          Dump only the charstring of the specified glyph.\n" +
             "                   <id> is a glyph index (e.g. 25), a glyph name\n" +
             "                   (e.g. /exclam) or a CID (e.g. CID1200).\n" +
+            "  -offsets         Dump offset arrays of INDEXes.\n" +
             "  <input_file>     Input file to be analyzed.\n"
         );
         System.exit(1);
@@ -788,7 +800,14 @@ public class CFFDump
             throw new CFFParseException("CFF2 font is not supported");
         }
         if (major != 1) {
-            throw new CFFParseException("Unsupported CFF version " + major + "." + minor);
+            String message = "Unsupported CFF version " + major + "." + minor;
+            if (input.capacity() >= 4) {
+                int fourBytes = (major << 24) | (minor << 16) | (readCard8() << 8) | readCard8();
+                if (fourBytes == OTF_OTTO) {
+                    message += ". This might be an OpenType font. Use -otf option.";
+                }
+            }
+            throw new CFFParseException(message);
         }
         int hdrSize = readCard8();
         sbMain.append("    hdrSize: ").append(hdrSize).append('\n');
@@ -824,7 +843,7 @@ public class CFFDump
         // Actually read the Top DICT INDEX
         input.position(topDictINDEXPos);
         printSectionHeading("Top DICT INDEX", sbMain);
-        List< HashMap<String,String> > topDicts = readDICTINDEX(sbMain, DICT_TYPE_TOP);
+        List< HashMap<String,String> > topDicts = readDICTINDEX(sbMain, DICT_TYPE_TOP, "Top DICT");
         input.position(stringINDEXEndPos); // don't read String INDEX again
 
         // Actually dump the String INDEX
@@ -835,6 +854,11 @@ public class CFFDump
         globalSubrINDEXOffset = input.position();
         int[] globalSubrINDEXOffSize = { -1 };
         int gsubrCount = getINDEXCount(-1, globalSubrINDEXOffSize);
+        // Validate offsets but don't dump. (Optional dumping is done in printGlobalSubrDumps().)
+        int curPosGsubr = input.position();
+        input.position(globalSubrINDEXOffset);
+        validateAndPrintINDEXOffsets(-1, 0, null, 0, 0, "Global Subr");
+        input.position(curPosGsubr);
         globalSubrBias = computeSubrBias(gsubrCount);
         globalSubrDumps = new String[gsubrCount];
 
@@ -920,6 +944,11 @@ public class CFFDump
             return;
         }
         sbMain.append(", subroutine bias: ").append(computeSubrBias(gsubrCount)).append('\n');
+
+        int curPos = input.position();
+        input.position(globalSubrINDEXOffset);
+        validateAndPrintINDEXOffsets(-1, 0, sbMain, 0, 0, "Global Subr");
+        input.position(curPos);
 
         for (int gsubrNo = 0; gsubrNo < gsubrCount; gsubrNo++) {
             String gsubr = globalSubrDumps[gsubrNo];
@@ -1741,45 +1770,75 @@ public class CFFDump
         return names;
     }
 
-    private void printOffsetArray(int count, int offSize, StringBuilder s) throws CFFParseException
+    /**
+     * Validates and optionally dumps the offset array of an INDEX.
+     * This writes only to the argument {@code s}.
+     * Printing offset arrays is typically disabled because they consume
+     * lots of space in the dump.
+     * Read the count and offSize before calling this, so the input is
+     * positioned at the first offset of the array.
+     */
+    private void validateAndPrintINDEXOffsets(int count, int offSize, StringBuilder s,
+    int offArrStart, int offRef, String description)
+    throws CFFParseException
     {
-        // This writes only to the argument {@code s}.
-        // Printing offset arrays is typically disabled because they consume
-        // lots of space in the dump.
+        final boolean enableDump = enablePrintingOffsetArrays && s != null;
+        final int curPos = input.position();
 
-        if (!ENABLE_PRINTING_OFFSET_ARRAYS) {
-            return;
+        if (count < 0) {
+            count = readCard16();
+            if (count == 0) {
+                input.position(curPos);
+                return;
+            }
+            offSize = readCard8();
+            offArrStart = input.position();
+            offRef = getOffRef(offArrStart, offSize, count);
+        }
+        if (enableDump) {
+            s.append("  Offsets of INDEX (relative to ").append(offRef).append("):\n    ");
         }
 
-        int curPos = input.position();
-        s.append("  offsets: ");
-        int maxIndexLength = getLengthAsString(count - 1);
-        int maxOffset = input.capacity() - 1;
-        int maxOffsetLength = getLengthAsString(maxOffset);
+        int maxIndexLength = getLengthAsString(count) + 2; // +2 for '[' and ']'
+        int maxValidOffset = input.capacity();
+        int maxValueRepresentableByOffSize = 1 << (8 * offSize);
+        int maxOffsetStringLength = getLengthAsString(maxValueRepresentableByOffSize);
         final int numColumns = 8;
         int columnCounter = 0;
 
-        for (int i = 0; i < count + 1; i++) {
+        for (int i = 0; i <= count; i++) {
             int offset = readOffset(offSize);
-
-            printPadded("[" + i + "]", -1, s, maxIndexLength);
-            s.append('=');
-            printPadded(Integer.toString(offset), -1, s, maxOffsetLength);
-            s.append(' ');
-            columnCounter++;
-
-            if (columnCounter >= numColumns) {
-                s.append("\n  ");
-                columnCounter = 0;
+            int absOffset = offset + offRef;
+            if (absOffset > maxValidOffset) {
+                addError("Invalid offset in " + description + " INDEX: " +
+                    absOffset + " > font data length");
             }
+            if (i == 0 && offset != 1) {
+                addError("Invalid offset in " + description + " INDEX: " +
+                    "first offset must be 1, not " + offset);
+            }
+            if (enableDump) {
+                printPadded("[" + i + "]", -1, s, maxIndexLength);
+                s.append(" = ");
+                printPadded(Integer.toString(offset), -1, s, maxOffsetStringLength);
+                s.append(' ');
+                columnCounter++;
+                if (columnCounter >= numColumns) {
+                    s.append("\n    ");
+                    columnCounter = 0;
+                }
+            }
+
         }
 
-        s.append('\n');
+        if (enableDump) {
+            s.append("\n  Data:\n");
+        }
         input.position(curPos); // revert back to original position
     }
 
-    private List< HashMap<String,String> > readDICTINDEX(StringBuilder s, int dictType)
-    throws CFFParseException
+    private List< HashMap<String,String> > readDICTINDEX(StringBuilder s, int dictType,
+    String description) throws CFFParseException
     {
         int numDicts = readCard16();
         // Generic arrays cannot be created, so use ArrayList instead.
@@ -1795,8 +1854,8 @@ public class CFFDump
         s.append(", offSize: ").append(offSize).append('\n');
 
         int offArrStart = input.position();
-        int offRef = offArrStart + offSize * (numDicts + 1) - 1;
-        printOffsetArray(numDicts, offSize, s);
+        int offRef = getOffRef(offArrStart, offSize, numDicts);
+        validateAndPrintINDEXOffsets(numDicts, offSize, s, offArrStart, offRef, description);
 
         for (int i = 0; i < numDicts; i++) {
             HashMap<String,String> dict = new HashMap<String,String>();
@@ -1838,8 +1897,8 @@ public class CFFDump
         s.append(", offSize: ").append(offSize).append('\n');
 
         int offArrStart = input.position();
-        int offRef = offArrStart + offSize * (numStrings + 1) - 1;
-        printOffsetArray(numStrings, offSize, s);
+        int offRef = getOffRef(offArrStart, offSize, numStrings);
+        validateAndPrintINDEXOffsets(numStrings, offSize, s, offArrStart, offRef, "String");
 
         String[] arr = new String[numStrings];
         int sid = 391;
@@ -1875,7 +1934,7 @@ public class CFFDump
         int offSize = readOffSize();
 
         int offArrStart = input.position();
-        int offRef = offArrStart + offSize * (count + 1) - 1;
+        int offRef = getOffRef(offArrStart, offSize, count);
 
         // Read the last offset of this INDEX
         int lastOffPos = offArrStart + count * offSize;
@@ -1945,7 +2004,8 @@ public class CFFDump
         StringBuilder sbFDI = new StringBuilder();
         input.position( dictGetInt(cidFontDict, KEY_FDARRAY_OFFSET, NO_DEFAULT) );
         printSectionHeading("Font DICT INDEX (a.k.a. FDArray)", sbFDI);
-        List< HashMap<String,String> > fdDicts = readDICTINDEX(sbFDI, DICT_TYPE_FD);
+        List< HashMap<String,String> > fdDicts = readDICTINDEX(sbFDI, DICT_TYPE_FD,
+            "FD DICT");
         int numFDs = fdDicts.size();
         fontDictIdxDump = sbFDI.toString();
 
@@ -2611,11 +2671,11 @@ public class CFFDump
 
         int offSize = readOffSize();
         int offArrStart = input.position();
-        int offRef = offArrStart + offSize * (numGlyphs + 1) - 1;
+        int offRef = getOffRef(offArrStart, offSize, numGlyphs);
 
         s.append("  count: ").append(numGlyphs);
         s.append(", offSize: ").append(offSize).append('\n');
-        printOffsetArray(numGlyphs, offSize, s);
+        validateAndPrintINDEXOffsets(numGlyphs, offSize, s, offArrStart, offRef, "CharStrings");
 
         if (!dumpCharstringsAndSubrs && dumpOnlyThisGlyph == null) {
             s.append("  <CharStrings dumping is disabled>\n");
@@ -2806,8 +2866,8 @@ public class CFFDump
             boolean found = true;
 
             int sfntVersion = raf.readInt();
-            // sfnt version must be "OTTO" = 0x4f54544f:
-            if (sfntVersion != 0x4F54544F) {
+            // sfnt version must be "OTTO"
+            if (sfntVersion != OTF_OTTO) {
                 throw new CFFParseException("This is not an OpenType-CFF file");
             }
 
@@ -3105,7 +3165,7 @@ public class CFFDump
                 break;
 
             case 10: { // callsubr
-                doClear = false;
+                // doClear = false;
                 int subrNoUnbiased = t2PopInt();
                 gs.subrLevel++;
                 int ret = executeLocalSubr(subrNoUnbiased, s, gs);
@@ -3229,7 +3289,7 @@ public class CFFDump
 
             case 29: {
                 // callgsubr
-                doClear = false;
+                // doClear = false;
                 int subrNoUnbiased = t2PopInt();
                 gs.subrLevel++;
                 int ret = executeGlobalSubr(subrNoUnbiased, s, gs);
@@ -3721,7 +3781,7 @@ public class CFFDump
 
         int offSize = readOffSize();
         int offArrStart = input.position();
-        int offRef = offArrStart + offSize * (count + 1) - 1;
+        int offRef = getOffRef(offArrStart, offSize, count);
         input.position(offArrStart + subrNo * offSize);
         int startOff = readOffset(offSize) + offRef;
         int endOff = readOffset(offSize) + offRef;
@@ -3817,7 +3877,12 @@ public class CFFDump
         if (count >= 0) {
             s.append(", subroutine bias: ").append(computeSubrBias(count)).append('\n');
         }
-        printOffsetArray(count, offSize, s);
+
+        int curPos = input.position();
+        input.position(offset);
+        validateAndPrintINDEXOffsets(-1, 0, s, 0, 0, "Local Subr");
+        input.position(curPos);
+
         return s.toString();
     }
 
@@ -3832,6 +3897,14 @@ public class CFFDump
         if (dumpOnlyThisGlyph != null) {
             dumpCharstringsAndSubrs = false;
         }
+    }
+
+    /**
+     * Enables the dumping of offset arrays of INDEX structures.
+     */
+    public void enableDumpingOffsetArrays(boolean b)
+    {
+        enablePrintingOffsetArrays = b;
     }
 
     /**
@@ -4116,7 +4189,7 @@ public class CFFDump
         }
         int offSize = readOffSize();
         int offArrStart = input.position();
-        int offRef = offArrStart + offSize * (count + 1) - 1;
+        int offRef = getOffRef(offArrStart, offSize, count);
         input.position(offArrStart + subrNo * offSize);
         int startOff = readOffset(offSize) + offRef;
         int endOff = readOffset(offSize) + offRef;
@@ -4124,6 +4197,15 @@ public class CFFDump
 
         input.position(posOrig);
         return new int[]{ startOff, len };
+    }
+
+    /**
+     * Computes "the point zero" of offsets in an INDEX. All offsets are relative
+     * to the returned value.
+     */
+    private static int getOffRef(int offArrStart, int offSize, int count)
+    {
+        return offArrStart + offSize * (count + 1) - 1;
     }
 
 }

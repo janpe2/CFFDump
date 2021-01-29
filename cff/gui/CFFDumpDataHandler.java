@@ -25,12 +25,12 @@ import cff.io.ASCII85DecoderStream;
 
 public class CFFDumpDataHandler
 {
-    private File file;
-    private boolean isOTF;
-    private boolean isFlate;
-    private boolean isA85;
-    private int fileOffset;
-    private boolean analyzeCharstrings;
+    private final File file;
+    private final boolean isOTF;
+    private final boolean isFlate;
+    private final boolean isA85;
+    private final int fileOffset;
+    private final boolean analyzeCharstrings;
 
     CFFDumpDataHandler(File file, boolean isOTF, boolean isFlate, boolean isA85,
     String fileOffset, boolean analyzeCharstrings)
@@ -61,9 +61,27 @@ public class CFFDumpDataHandler
                 cffDump = new CFFDump(is, file);
             }
 
+            // We can now close the stream.
+            if (is != null) {
+                is.close();
+                is = null;
+            }
+
             cffDump.enableDumpingCharstringsAndSubrs(analyzeCharstrings);
-            cffDump.parseCFF();
-            return cffDump.getResult();
+            String dump = "";
+
+            try {
+                cffDump.parseCFF();
+                dump = cffDump.getResult();
+            } catch (Exception ex) {
+                dump += "\nException: " + ex + "\n";
+                // ex.printStackTrace();
+                if (cffDump.hasErrors()) {
+                    dump += "\nThere we errors:\n" + cffDump.getErrors();
+                }
+            }
+
+            return dump;
 
         } finally {
             if (is != null) {

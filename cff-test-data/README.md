@@ -36,3 +36,5 @@ The dump of `simple.cff`.
 `supplemental-encoding.cff`
 Encoding contains a Supplemental encoding, which allows to encode one glyph name to more than one character codes.
 
+`global_subrs.cff`
+Contains a non-empty `Global Subr INDEX`. This font also has some local and global subroutines that are never used.

@@ -35,21 +35,20 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.UIManager;
-import cff.CFFDump;
 
 /**
  * Main GUI frame.
  */
 public class CFFDumpFrame extends JFrame implements ActionListener
 {
-    private JButton buttonStart;
-    private JButton buttonChooseFile;
-    private JCheckBox checkBoxAnalyzeCharstrings;
-    private JComboBox comboInputType;
-    private JComboBox comboFilter;
-    private JTextField textFieldOffset;
-    private JTextField textFieldFile;
-    private JTextArea textAreaOutput;
+    private final JButton buttonStart;
+    private final JButton buttonChooseFile;
+    private final JCheckBox checkBoxAnalyzeCharstrings;
+    private final JComboBox comboInputType;
+    private final JComboBox comboFilter;
+    private final JTextField textFieldOffset;
+    private final JTextField textFieldFile;
+    private final JTextArea textAreaOutput;
     private File lastUsedDirectory;
 
     private static final String INPUT_TYPE_PDF_OR_RAW = "PDF or Raw CFF File";
@@ -133,6 +132,11 @@ public class CFFDumpFrame extends JFrame implements ActionListener
         pack();
     }
 
+    public static void main(String[] args)
+    {
+        launchGUI();
+    }
+
     public static void launchGUI()
     {
         try {
@@ -141,12 +145,14 @@ public class CFFDumpFrame extends JFrame implements ActionListener
             System.err.println("Unable to load look and feel");
         }
         EventQueue.invokeLater(new Runnable() {
+            @Override
             public void run() {
                 new CFFDumpFrame().setVisible(true);
             }
         });
     }
 
+    @Override
     public void actionPerformed(ActionEvent e)
     {
         Object source = e.getSource();
@@ -196,7 +202,13 @@ public class CFFDumpFrame extends JFrame implements ActionListener
             textAreaOutput.setCaretPosition(0);
 
         } catch (Exception ex) {
-            textAreaOutput.setText(ex.toString());
+            String message = ex.getMessage();
+            if (message != null) {
+                message = message + " (" + ex.getClass().getName() + ")";
+            } else {
+                message = ex.toString();
+            }
+            textAreaOutput.setText(message);
         }
     }
 

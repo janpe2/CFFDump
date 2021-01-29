@@ -23,11 +23,11 @@ import java.io.IOException;
  */
 public class ASCII85DecoderStream extends InputStream
 {
-    private InputStream input;
+    private final InputStream input;
     private boolean error = false;
     private boolean endOfData = false;
     private int fiveTupleCounter = 0;
-    private byte[] decodedBuff = new byte[4];
+    private final byte[] decodedBuff = new byte[4];
     private int numDecodedBytes;
     private int decodeBuffIndex = -1;
     private long codeWord;
@@ -39,6 +39,7 @@ public class ASCII85DecoderStream extends InputStream
         input = is;
     }
 
+    @Override
     public int read() throws IOException
     {
         if (error) {
@@ -210,6 +211,7 @@ public class ASCII85DecoderStream extends InputStream
         decodedBuff[3] = (byte)codeWord;
     }
 
+    @Override
     public void close() throws IOException
     {
         input.close();
