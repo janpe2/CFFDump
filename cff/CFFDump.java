@@ -76,19 +76,14 @@ public class CFFDump
     private Stack<DictValue> dictStack = new Stack<DictValue>();
     private String dumpOnlyThisGlyph = null;
     private boolean containsSupplementalEncodings;
-    private boolean containsSeacs;
-    private boolean containsFlex;
     private boolean dumpCharstringsAndSubrs = true;
     private int unusedGlobalSubrs = 0;
     private int unusedLocalSubrs = 0;
     private static final int NO_DEFAULT = Integer.MIN_VALUE;
     private boolean enablePrintingOffsetArrays;
-    private final float[] type2Stack = new float[48];
-    private int type2StackCount;
-    private float[] transientArray = null; // initialized on first use
     private boolean isCIDFont;
     private boolean enableStoringCharsetAndMetrics;
-    private HashMap<Integer,Float> gidToWidth;
+    HashMap<Integer,Float> gidToWidth;
     private String[] charsetArray;
     private int numberOfGlyphs;
     private String fontName;
@@ -103,7 +98,7 @@ public class CFFDump
     private String charsetDump;
     private String fdSelectDump;
     private String fontDictIdxDump;
-    private boolean foundEndChar;
+    private Type2CharStringDump type2Dumper;
 
     /**
      * Data is not encoded nor compressed.
@@ -155,13 +150,13 @@ public class CFFDump
      * Specifies the nominalWidthX values for each Private DICT.
      * This contains only one entry for a base font.
      */
-    private float[] nominalWidths;
+    float[] nominalWidths;
 
     /**
      * Specifies the defaultWidthX values for each Private DICT.
      * This contains only one entry for a base font.
      */
-    private float[] defaultWidths;
+    float[] defaultWidths;
 
     /**
      * Dumps of local subroutines. The indices of the outer list are FD indices
@@ -172,27 +167,9 @@ public class CFFDump
     private final ArrayList< ArrayList<String> > localSubrDumps =
         new ArrayList< ArrayList<String> >();
 
-    private static final String CHARSTRING_INDENT = "    ";
     private static final String SECTION_DIVIDER =
         "\n--------------------------------------------------------------------------------\n\n";
-    private static final int MAX_SUBR_NESTING = 10;
     private static final int MAX_STEM_HINTS = 96;
-
-    /**
-     * Return value for charstring parsing: continue parsing.
-     */
-    private static final int CHARSTRING_END_CONTINUE = 0;
-
-    /**
-     * Return value for charstring parsing: operator {@code endchar} finished the glyph.
-     */
-    private static final int CHARSTRING_END_ENDCHAR = 1;
-
-    /**
-     * Return value for charstring parsing: subroutine ended with the
-     * {@code return} operator.
-     */
-    private static final int CHARSTRING_END_RETURN = 2;
 
     /**
      * Dictionary type: Top DICT.
@@ -274,44 +251,6 @@ public class CFFDump
         "Uacutesmall", "Ucircumflexsmall", "Udieresissmall", "Yacutesmall", "Thornsmall",
         "Ydieresissmall", "001.000", "001.001", "001.002", "001.003", "Black", "Bold",
         "Book", "Light", "Medium", "Regular", "Roman", "Semibold"
-    };
-
-    /**
-     * Names for one-byte Type2 operators.
-     */
-    private static final String[] TYPE2_OP_NAMES = {
-        null,         //  0 -Reserved-
-        "hstem",      //  1
-        null,         //  2 -Reserved-
-        "vstem",      //  3
-        "vmoveto",    //  4
-        "rlineto",    //  5
-        "hlineto",    //  6
-        "vlineto",    //  7
-        "rrcurveto",  //  8
-        null,         //  9 -Reserved-
-        "callsubr",   // 10
-        "return",     // 11
-        null,         // 12 escape for two-byte operators
-        null,         // 13 -Reserved-
-        "endchar",    // 14
-        null,         // 15 -Reserved-
-        null,         // 16 -Reserved-
-        null,         // 17 -Reserved-
-        "hstemhm" ,   // 18
-        "hintmask",   // 19
-        "cntrmask",   // 20
-        "rmoveto",    // 21
-        "hmoveto",    // 22
-        "vstemhm",    // 23
-        "rcurveline", // 24
-        "rlinecurve", // 25
-        "vvcurveto",  // 26
-        "hhcurveto",  // 27
-        null,         // 28 short int
-        "callgsubr",  // 29
-        "vhcurveto",  // 30
-        "hvcurveto"   // 31
     };
 
     /**
@@ -709,6 +648,7 @@ public class CFFDump
     private void initialize(byte[] arr, int startOffset, String file, String message)
     {
         input = ByteBuffer.wrap(arr);
+        type2Dumper = new Type2CharStringDump(this, input);
 
         sbMain.append("% CFF Dump Output\n");
         sbMain.append("% File: ").append(file).append('\n');
@@ -735,7 +675,7 @@ public class CFFDump
         return baos.toByteArray();
     }
 
-    private static byte[] hexToBytes(InputStream is) throws IOException
+    public static byte[] hexToBytes(InputStream is) throws IOException
     {
         ByteArrayOutputStream baos = new ByteArrayOutputStream(1024);
         is = new BufferedInputStream(is, 1024);
@@ -1261,15 +1201,6 @@ public class CFFDump
         } else {
             s.append(f);
         }
-    }
-
-    private String doubleToString(double f)
-    {
-        int i = (int)f;
-        if (f == i) {
-            return Integer.toString(i);
-        }
-        return Double.toString(f);
     }
 
     /**
@@ -1807,7 +1738,7 @@ public class CFFDump
         int columnCounter = 0;
 
         for (int i = 0; i <= count; i++) {
-            int offset = readOffset(offSize);
+            final int offset = readOffset(offSize);
             int absOffset = offset + offRef;
             if (absOffset > maxValidOffset) {
                 addError("Invalid offset in " + description + " INDEX: " +
@@ -1828,7 +1759,6 @@ public class CFFDump
                     columnCounter = 0;
                 }
             }
-
         }
 
         if (enableDump) {
@@ -2725,17 +2655,17 @@ public class CFFDump
         input.position(startOff);
 
         int fdIndex = isCIDFont ? getFDIndexForGid(gid) : 0;
-        GlyphStatus gs = new GlyphStatus(gid, fdIndex);
+        GlyphStatus gs = new GlyphStatus(gid, fdIndex, this);
 
-        clearType2Stack();
-        foundEndChar = false;
-        executeCharString(s, gs, endOff, false);
+        type2Dumper.clearType2Stack();
+        type2Dumper.foundEndChar = false;
+        type2Dumper.executeCharString(s, gs, endOff, false);
 
         if (gs.stemHintCount > MAX_STEM_HINTS) {
             s.append("    % ERROR: Glyph has too many stem hints\n");
             addError("Glyph has too many stem hints");
         }
-        if (!foundEndChar) {
+        if (!type2Dumper.foundEndChar) {
             // Note the {@code endchar} may appear in a (nested) subroutine.
             s.append("    % ERROR: Glyph does not end with 'endchar'\n");
             addError("Glyph does not end with 'endchar'");
@@ -2795,7 +2725,7 @@ public class CFFDump
             sbMain.append("Info: This is a CIDFont.\n");
             hasInfo = true;
         }
-        if (containsSeacs) {
+        if (type2Dumper.containsSeacs) {
             sbMain.append("Info: Operator endchar is used as \"seac\".\n");
             hasInfo = true;
         }
@@ -2803,7 +2733,7 @@ public class CFFDump
             sbMain.append("Info: Font uses supplemental encoding.\n");
             hasInfo = true;
         }
-        if (containsFlex) {
+        if (type2Dumper.containsFlex) {
             sbMain.append("Info: Font contains flex segments\n");
             hasInfo = true;
         }
@@ -2929,764 +2859,6 @@ public class CFFDump
         return fdIdx;
     }
 
-    /**
-     * Executes a glyph charstring or a subroutine.
-     *
-     * A subroutine may end with an {@code endchar} and there is no {@code return}.
-     * This {@code endchar} ends the glyph that invoked the subroutine. To successfully finish
-     * charstring parsing also in this situation, we return the value CHARSTRING_END_ENDCHAR
-     * from executeCharString() that is parsing the subroutine.
-     *
-     * prevLimit is needed to allow using limits in (nested) subroutines.
-     * Otherwise limits would fail because subroutines would set their
-     * own limit and clear the earlier limit.
-     * For example in PDFJS-10544_CFF.pdf fonts cannot be parsed without
-     * using limits. Some CFF glyphs in this PDF contain garbage data that
-     * is read correctly only if we use limits. If we didn't use
-     * limits, we would read charstrings way too far before we encounter an
-     * {@code endchar} that actually belongs to some other glyph.
-     */
-    private int executeCharString(StringBuilder s, GlyphStatus gs, int endOffset, boolean isSubr)
-    throws CFFParseException
-    {
-        // When charstrings are dumped, this method truly processes the operands of all
-        // operators using the Type2 stack and executes all subroutine calls.
-        // If the subroutines were not truly called, the following problem would arise:
-        // If a subroutine invokes stem hint operators ({@code hstem, vstem, hstemhm, vstemhm}),
-        // the calling charstring knows nothing about them. Then, if the calling charstring
-        // contains operators {@code hintmask} and {@code cntrmask}, their mask
-        // bytes cannot be read correctly because the hints of the subroutines cannot be
-        // included in stem hint count. As a result, the rest of the charstring dumping fails
-        // because the mask bytes of {@code hintmask} and {@code cntrmask} will be used
-        // erroneously as operator codes or operands.
-        //
-        // The approach has a disadvantage: If a CFF font has any subroutines that are
-        // never executed, their content can't be dumped.
-        //
-        // If the Type2 stack was not used, the following problem would arise:
-        // If subroutines push or pop values to/from the Type2 stack, the calling
-        // charstring knows nothing about these modifications. Thus errors would appear
-        // in the dump.
-
-        if (gs.subrLevel > MAX_SUBR_NESTING) {
-            addError("Subroutines are too deeply nested");
-        }
-
-        final int prevLimit = input.limit(); // save previous limit
-        input.limit(endOffset);
-
-        s.append(CHARSTRING_INDENT);
-        int lastOperator = -1;
-        int returnValue = CHARSTRING_END_CONTINUE;
-
-        while (input.position() < endOffset) {
-            int b = readT2Byte();
-            if (b == -1) {
-                break;
-            }
-            if (b >= 32) {
-                parseCharStringNumber(b, s);
-            } else if (b == 12) {
-                // Escaped two-byte command.
-                if (input.position() >= endOffset) {
-                    throw new CFFParseException(
-                        "End of charstring while reading a two-byte operator");
-                }
-                b = readT2Byte();
-                if (b == -1) {
-                    break;
-                }
-                lastOperator = (12 << 8) | b;
-                type2EscapedOperator(b, s, gs);
-                s.append(CHARSTRING_INDENT);
-            } else if (b == 28) {
-                // A ShortInt value.
-                if (input.position() + 1 >= endOffset) {
-                    throw new CFFParseException("End of charstring while reading a ShortInt");
-                }
-                int shortInt = readT2Short();
-                t2Push(shortInt);
-                s.append(shortInt); // if cast to float, make sure the sign of short gets extended
-                s.append(' ');
-            } else {
-                // Commands {@code endchar} and {@code return} finish this charstring analysis
-                lastOperator = b;
-                int ret = type2Operator(b, s, gs);
-                if (ret != CHARSTRING_END_CONTINUE) {
-                    returnValue = ret;
-                    break;
-                }
-                s.append(CHARSTRING_INDENT);
-            }
-        }
-
-        if (input.position() != endOffset) {
-            s.append("    % ERROR: Invalid charstring end offset (reading ended at ").
-                append(input.position()).append(" but INDEX specifies end at ").
-                append(endOffset).append(")\n");
-            addError("Invalid charstring end offset");
-        }
-
-        /*
-        // This is commented out because this will report an error in most FontFolio fonts.
-        // It seems that it is OK to omit {@code return} in a subroutine that ends with a call
-        // to another subroutine that ends with an {@code endchar}.
-        if (isSubr && lastOperator != 11 && lastOperator != 14) {
-            // Subroutines must end with a {@code return} or {@code endchar}. If the subroutine
-            // ends with an {@code endchar}, operator {@code return} is not necessary.
-            s.append("    % ERROR: Subroutine does not end with 'return'\n");
-            addError("Subroutine does not end with 'return'");
-        }
-        */
-
-        if (s.length() > 0 && s.charAt(s.length() - 1) != '\n') {
-            s.append('\n');
-        }
-
-        input.limit(prevLimit); // Restore previous limit
-        return returnValue;
-    }
-
-    private void parseCharStringNumber(int v, StringBuilder s) throws CFFParseException
-    {
-        int num = 0;
-
-        if (v <= 246) {
-            // 32 <= v <= 246
-            num = v - 139;
-        } else if (v <= 250) {
-            // 247 <= v <= 250
-            int w = readT2Byte();
-            num = (v - 247) * 256 + w + 108;
-        } else if (v <= 254) {
-            // 251 <= v <= 254
-            int w = readT2Byte();
-            num = -256 * (v - 251) - w - 108;
-        } else if (v == 255) {
-            double fixed = readT2Int() / 65536.0;
-            s.append(fixed);
-            s.append(' ');
-            t2Push((float)fixed);
-            return;
-        } else {
-            throw new CFFParseException("Illegal Type 2 number (byte " + v + ")");
-        }
-
-        s.append(num);
-        s.append(' ');
-        t2Push(num);
-    }
-
-    /**
-     * Executes a Type2 charstring operator.
-     * Returns true when operators {@code endchar} or {@code return} end a charstring.
-     */
-    private int type2Operator(int op, StringBuilder s, GlyphStatus gs)
-    throws CFFParseException
-    {
-        boolean doClear = true;
-        String opName = (op >= 0 && op < TYPE2_OP_NAMES.length) ? TYPE2_OP_NAMES[op] : null;
-
-        switch (op) {
-            case 1:  // hstem
-            case 3:  // vstem
-            case 18: // hstemhm
-            case 23: // vstemhm
-               s.append(opName);
-               gs.stemHintCount += type2StackCount / 2;
-               if (type2StackCount < 2) {
-                   invalidNumOperands(s, opName);
-               }
-               if (!gs.foundGlyphWidth) {
-                   int numHintOperands;
-                   if ((type2StackCount % 2) == 1) {
-                       numHintOperands = type2StackCount - 1;
-                       gs.setGlyphWidth(type2Stack[0], s);
-                   } else {
-                       numHintOperands = type2StackCount;
-                       gs.setDefaultWidth(s);
-                   }
-                   gs.foundGlyphWidth = true;
-                   if((numHintOperands % 2) != 0) {
-                       invalidNumOperands(s, opName);
-                   }
-               } else {
-                   if ((type2StackCount % 2) != 0) {
-                       invalidNumOperands(s, opName);
-                   }
-               }
-               s.append('\n');
-               break;
-
-            case 4:  // vmoveto
-            case 22: // hmoveto
-                s.append(opName);
-                if (!gs.foundGlyphWidth) {
-                    if (type2StackCount < 1 || type2StackCount > 2) {
-                        invalidNumOperands(s, opName);
-                    }
-                    if (type2StackCount == 2) {
-                        gs.setGlyphWidth(type2Stack[0], s);
-                    } else {
-                        gs.setDefaultWidth(s);
-                    }
-                    gs.foundGlyphWidth = true;
-                } else {
-                    if (type2StackCount != 1) {
-                        invalidNumOperands(s, opName);
-                    }
-                }
-                s.append('\n');
-                break;
-
-            case 5: // rlineto
-                s.append(opName).append('\n');
-                gs.checkWidthFound(s, opName);
-                if (type2StackCount < 2 || (type2StackCount % 2) != 0) {
-                    invalidNumOperands(s, opName);
-                }
-                break;
-
-            case 6: // hlineto
-            case 7: // vlineto
-                s.append(opName).append('\n');
-                gs.checkWidthFound(s, opName);
-                if (type2StackCount < 1) {
-                    invalidNumOperands(s, opName);
-                }
-                break;
-
-            case 8: // rrcurveto
-                s.append(opName).append('\n');
-                gs.checkWidthFound(s, opName);
-                if (type2StackCount < 6 || (type2StackCount % 6) != 0) {
-                    invalidNumOperands(s, opName);
-                }
-                break;
-
-            case 10: { // callsubr
-                // doClear = false;
-                int subrNoUnbiased = t2PopInt();
-                gs.subrLevel++;
-                int ret = executeLocalSubr(subrNoUnbiased, s, gs);
-                gs.subrLevel--;
-                gs.ensureWidthIsPrinted(s);
-                return ret;
-            }
-
-            case 11: // return
-                s.append(opName).append('\n');
-                return CHARSTRING_END_RETURN;
-
-            case 14: // endchar
-                s.append(opName);
-                foundEndChar = true;
-                // The number of operands must be 0, 1, 4, or 5.
-                if (!(type2StackCount == 0 || type2StackCount == 1 ||
-                      type2StackCount == 4 || type2StackCount == 5)) {
-                    invalidNumOperands(s, opName);
-                }
-                if (type2StackCount == 4 || type2StackCount == 5) {
-                    s.append("  % \"seac\"");
-                    containsSeacs = true;
-                }
-                if (!gs.foundGlyphWidth) {
-                    if (type2StackCount == 1 || type2StackCount == 5) {
-                        gs.setGlyphWidth(type2Stack[0], s);
-                    } else {
-                        gs.setDefaultWidth(s);
-                    }
-                    gs.foundGlyphWidth = true;
-                }
-                s.append('\n');
-                clearType2Stack();
-                return CHARSTRING_END_ENDCHAR;
-
-            case 19:   // hintmask
-            case 20: { // cntrmask
-                // hintmask and cntrmask may take vstem values and glyph width as operands.
-                s.append(opName).append(' ');
-                gs.stemHintCount += type2StackCount / 2;
-                if (gs.stemHintCount == 0) {
-                    String errorMsg = "No stem hints exist for " + opName;
-                    s.append("  % ERROR! ").append(errorMsg).append(' ');
-                    addError(errorMsg);
-                } else {
-                    // Mask bit bytes follow the operator. They are "raw" bytes that
-                    // are not in Type 2 encoded format.
-                    int numBytesFollow = (gs.stemHintCount + 7) / 8; // 1 bit per stem hint
-                    readHintMaskBytes(numBytesFollow, s);
-                }
-                if (!gs.foundGlyphWidth) {
-                    if ((type2StackCount % 2) == 1) {
-                        gs.setGlyphWidth(type2Stack[0], s);
-                    } else {
-                        gs.setDefaultWidth(s);
-                    }
-                    gs.foundGlyphWidth = true;
-                } else {
-                    if ((type2StackCount % 2) == 1) {
-                        invalidNumOperands(s, opName);
-                    }
-                }
-                s.append('\n');
-                break;
-            }
-
-            case 21: { // rmoveto
-                // Ghostscript says: Some Type 2 charstrings omit the vstemhm operator before
-                // rmoveto even though this is only allowed before hintmask and cntrmask.
-                // We don't support that.
-                s.append(opName);
-                int n = type2StackCount;
-                if (!gs.foundGlyphWidth) {
-                    if (n < 2 || n > 3) {
-                        invalidNumOperands(s, opName);
-                    }
-                    if ((n % 2) != 0) {
-                        gs.setGlyphWidth(type2Stack[0], s);
-                        n--;
-                    } else {
-                        gs.setDefaultWidth(s);
-                    }
-                    gs.foundGlyphWidth = true;
-                } else {
-                    if (n != 2) {
-                        invalidNumOperands(s, opName);
-                    }
-                }
-                s.append('\n');
-                break;
-            }
-
-            case 24:
-                // rcurveline
-                s.append(opName).append('\n');
-                gs.checkWidthFound(s, opName);
-                if (type2StackCount < 8 || ((type2StackCount - 2) % 6) != 0) {
-                    invalidNumOperands(s, opName);
-                }
-                break;
-
-            case 25:
-                // rlinecurve
-                s.append(opName).append('\n');
-                gs.checkWidthFound(s, opName);
-                if (type2StackCount < 8 || ((type2StackCount - 6) % 2) != 0) {
-                    invalidNumOperands(s, opName);
-                }
-                break;
-
-            case 26: // vvcurveto
-            case 27: // hhcurveto
-                s.append(opName).append('\n');
-                gs.checkWidthFound(s, opName);
-                if (type2StackCount < 4 ||
-                    ((type2StackCount % 4) != 0 && ((type2StackCount - 1) % 4) != 0)) {
-                    invalidNumOperands(s, opName);
-                }
-                break;
-
-            case 29: {
-                // callgsubr
-                // doClear = false;
-                int subrNoUnbiased = t2PopInt();
-                gs.subrLevel++;
-                int ret = executeGlobalSubr(subrNoUnbiased, s, gs);
-                gs.subrLevel--;
-                gs.ensureWidthIsPrinted(s);
-                return ret;
-            }
-
-            case 30: // vhcurveto
-            case 31: { // hvcurveto
-                s.append(opName).append('\n');
-                gs.checkWidthFound(s, opName);
-                if (type2StackCount < 4) {
-                    invalidNumOperands(s, opName);
-                }
-                boolean ok = false;
-                if (((type2StackCount - 4) % 8) == 0) {
-                    ok = true;
-                } else if (type2StackCount >= 5 && ((type2StackCount - 5) % 8) == 0) {
-                    ok = true;
-                } else if (type2StackCount >= 8 && ((type2StackCount - 8) % 8) == 0) {
-                    ok = true;
-                } else if (type2StackCount >= 9 && ((type2StackCount - 9) % 8) == 0) {
-                    ok = true;
-                }
-                if (!ok) {
-                    invalidNumOperands(s, opName);
-                }
-                break;
-            }
-
-            default:
-                s.append("operator_").append(op);
-                s.append("  % ERROR! Invalid operator ").append(op).append('\n');
-                addError("Invalid operator in charstring");
-                // throw new CFFParseException(
-                //    "Invalid Type2 operator (" + op + ") in glyph #" + gs.gid);
-                break;
-        }
-
-        if (doClear) {
-            clearType2Stack();
-        }
-        return CHARSTRING_END_CONTINUE;
-    }
-
-    private void type2EscapedOperator(int op, StringBuilder s, GlyphStatus gs)
-    throws CFFParseException
-    {
-        // Stack manipulation operators are dumped so that their arguments reflect the
-        // state of the stack before the operator has been executed. For example, if the
-        // dump is "1 2 exch" ==> after {@code exch} has been executed, the stack is |- 2 1.
-
-        // "Weird" operators like exch, sqrt, random are typically never used in
-        // actual glyph charstrings. (I think they are meant for MultipleMaster
-        // parameter computations [that are not charstrings]. The support for MM
-        // fonts has been removed from the CFF Spec a long time ago. In practice,
-        // CFF MM fonts don't exist.)
-
-        boolean doClear = false;
-        float x, y;
-
-        switch (op) {
-            case 0: // dotsection (deprecated)
-                doClear = true;
-                if (type2StackCount != 0) {
-                    invalidNumOperands(s, "dotsection");
-                }
-                s.append("dotsection");
-                break;
-            case 3: // and
-                if (type2StackCount < 2) {
-                    invalidNumOperands(s, "and");
-                }
-                x = t2Pop();
-                y = t2Pop();
-                t2Push( (x != 0 && y != 0) ? 1 : 0 );
-                s.append("and");
-                break;
-            case 4:  // or
-                if (type2StackCount < 2) {
-                    invalidNumOperands(s, "or");
-                }
-                x = t2Pop();
-                y = t2Pop();
-                t2Push( (x != 0 || y != 0) ? 1 : 0 );
-                s.append("or");
-                break;
-            case 5:  // not
-                if (type2StackCount < 1) {
-                    invalidNumOperands(s, "not");
-                }
-                x = t2Pop();
-                t2Push( (x != 0) ? 0 : 1 );
-                s.append("not");
-                break;
-            case 9:  // abs
-                if (type2StackCount < 1) {
-                    invalidNumOperands(s, "abs");
-                }
-                x = t2Pop();
-                t2Push(Math.abs(x));
-                s.append("abs");
-                break;
-            case 10: // add
-                if (type2StackCount < 2) {
-                    invalidNumOperands(s, "add");
-                }
-                x = t2Pop();
-                y = t2Pop();
-                t2Push(x + y);
-                s.append("add");
-                break;
-            case 11: // sub
-                if (type2StackCount < 2) {
-                    invalidNumOperands(s, "sub");
-                }
-                y = t2Pop();
-                x = t2Pop();
-                t2Push(x - y);
-                s.append("sub");
-                break;
-            case 12: // div
-                if (type2StackCount < 2) {
-                    invalidNumOperands(s, "div");
-                }
-                y = t2Pop();
-                x = t2Pop();
-                if (y == 0) {
-                    t2Push(0);
-                } else {
-                    t2Push(x / y);
-                }
-                s.append("div");
-                break;
-            case 14: // neg
-                if (type2StackCount < 1) {
-                    invalidNumOperands(s, "neg");
-                }
-                x = t2Pop();
-                t2Push(-x);
-                s.append("neg");
-                break;
-            case 15: // eq
-                if (type2StackCount < 2) {
-                    invalidNumOperands(s, "eq");
-                }
-                x = t2Pop();
-                y = t2Pop();
-                t2Push( (x == y) ? 1 : 0 );
-                s.append("eq");
-                break;
-            case 18: // drop
-                if (type2StackCount < 1) {
-                    invalidNumOperands(s, "drop");
-                }
-                t2Pop();
-                s.append("drop");
-                break;
-            case 20: { // put
-                if (type2StackCount < 2) {
-                    invalidNumOperands(s, "put");
-                }
-                if (transientArray == null) {
-                    transientArray = new float[32];
-                }
-                int i = t2PopInt();
-                float val = t2Pop();
-                transientArray[i] = val;
-                s.append("put");
-                break;
-            }
-            case 21: { // get
-                if (type2StackCount < 1) {
-                    invalidNumOperands(s, "get");
-                }
-                if (transientArray == null) {
-                    transientArray = new float[32];
-                }
-                int i = t2PopInt();
-                float val = transientArray[i];
-                t2Push(val);
-                s.append("get");
-                break;
-            }
-            case 22: { // ifelse
-                if (type2StackCount < 4) {
-                    invalidNumOperands(s, "ifelse");
-                }
-                float s1, s2, v1, v2;
-                v2 = t2Pop();
-                v1 = t2Pop();
-                s2 = t2Pop();
-                s1 = t2Pop();
-                if (v1 <= v2) {
-                    t2Push(s1);
-                } else {
-                    t2Push(s2);
-                }
-                s.append("ifelse");
-                break;
-            }
-            case 23: // random
-                // We should use the initialRandomSeed entry of the Private DICT.
-                // Actually, it would be better to use the same randomizing algorithm
-                // as in PostScript interpreters.
-                if (type2StackCount != 0) {
-                    invalidNumOperands(s, "random");
-                }
-                t2Push((float)Math.random());
-                s.append("random");
-                break;
-            case 24: // mul
-                if (type2StackCount < 2) {
-                    invalidNumOperands(s, "mul");
-                }
-                y = t2Pop();
-                x = t2Pop();
-                t2Push(x * y);
-                s.append("mul");
-                break;
-            case 26: // sqrt
-                if (type2StackCount < 1) {
-                    invalidNumOperands(s, "sqrt");
-                }
-                x = t2Pop();
-                if (x < 0) {
-                    t2Push(0);
-                } else {
-                    t2Push((float)Math.sqrt(x));
-                }
-                s.append("sqrt");
-                break;
-            case 27: // dup
-                if (type2StackCount < 1) {
-                    invalidNumOperands(s, "dup");
-                }
-                x = t2Pop();
-                t2Push(x);
-                t2Push(x);
-                s.append("dup");
-                break;
-            case 28: // exch
-                if (type2StackCount < 2) {
-                    invalidNumOperands(s, "exch");
-                }
-                x = t2Pop();
-                y = t2Pop();
-                t2Push(x);
-                t2Push(y);
-                s.append("exch");
-                break;
-            case 29: { // index
-                if (type2StackCount < 1) {
-                    invalidNumOperands(s, "index");
-                }
-                int i = t2PopInt();
-                if (i < 0) {
-                    x = t2Pop();
-                    t2Push(x);
-                    t2Push(x);
-                } else if (i >= type2StackCount) {
-                    // Undefined operation.
-                    addError("Invalid stack access in operator 'index'");
-                } else {
-                    x = type2Stack[type2StackCount - i - 1];
-                    t2Push(x);
-                }
-                s.append("index");
-                break;
-            }
-            case 30: { // roll
-                if (type2StackCount < 2) {
-                    invalidNumOperands(s, "roll");
-                }
-                int j = t2PopInt();
-                int n = t2PopInt();
-                if (n <= 1 || n > type2StackCount) {
-                    addError("Invalid stack access in operator 'roll'");
-                    return;
-                }
-                // This implementation is very inefficient but fortunately the
-                // roll operator is not used in fonts.
-                if (j > 0) {
-                    for (int i = 0; i < j; i++) {
-                        rollUpOneStep(n);
-                    }
-                } else {
-                    j = -j;
-                    for (int i = 0; i < j; i++) {
-                        rollDownOneStep(n);
-                    }
-                }
-                s.append("roll");
-                break;
-            }
-            case 34: // hflex
-                gs.checkWidthFound(s, "hflex");
-                if (type2StackCount != 7) {
-                    invalidNumOperands(s, "hflex");
-                }
-                doClear = true;
-                containsFlex = true;
-                s.append("hflex");
-                break;
-            case 35: // flex
-                gs.checkWidthFound(s, "flex");
-                if (type2StackCount != 13) {
-                    invalidNumOperands(s, "flex");
-                }
-                doClear = true;
-                containsFlex = true;
-                s.append("flex");
-                break;
-            case 36: // hflex1
-                gs.checkWidthFound(s, "hflex1");
-                if (type2StackCount != 9) {
-                    invalidNumOperands(s, "hflex1");
-                }
-                doClear = true;
-                containsFlex = true;
-                s.append("hflex1");
-                break;
-            case 37:  // flex1
-                gs.checkWidthFound(s, "flex1");
-                if (type2StackCount != 11) {
-                    invalidNumOperands(s, "flex1");
-                }
-                doClear = true;
-                containsFlex = true;
-                s.append("flex1");
-                break;
-            default:
-                s.append("operator_12_").append(op);
-                s.append("  % ERROR! Invalid operator 12 ").append(op).append('\n');
-                addError("Invalid operator in charstring");
-                // throw new CFFParseException(
-                //     "Invalid Type2 operator (12 " + op + ") in glyph #" + gs.gid);
-                break;
-        }
-
-        s.append('\n');
-        if (doClear) {
-            clearType2Stack();
-        }
-    }
-
-    private void clearType2Stack()
-    {
-        type2StackCount = 0;
-    }
-
-    private void t2Push(float f) throws CFFParseException
-    {
-        if (type2StackCount >= type2Stack.length) {
-            throw new CFFParseException("Type 2 stack overflow");
-        }
-        type2Stack[ type2StackCount++ ] = f;
-    }
-
-    private float t2Pop() throws CFFParseException
-    {
-        if (type2StackCount <= 0) {
-            throw new CFFParseException("Type 2 stack underflow");
-        }
-        return type2Stack[ --type2StackCount ];
-    }
-
-    private int t2PopInt() throws CFFParseException
-    {
-        return (int)t2Pop();
-    }
-
-    private int readT2Byte() throws CFFParseException
-    {
-        if (input.remaining() < 1) {
-            throw new CFFParseException("ByteBuffer underflow (read byte)");
-        }
-        return input.get() & 0xFF;
-    }
-
-    private int readT2Short() throws CFFParseException
-    {
-        if (input.remaining() < 1) {
-            throw new CFFParseException("ByteBuffer underflow (read ShortInt)");
-        }
-        return input.getShort();
-    }
-
-    private int readT2Int() throws CFFParseException
-    {
-        if (input.remaining() < 1) {
-            throw new CFFParseException("ByteBuffer underflow (read LongInt 16.16)");
-        }
-        return input.getInt();
-    }
-
     private int computeSubrBias(int numSubrs)
     {
         if (numSubrs < 1240) {
@@ -3696,40 +2868,6 @@ public class CFFDump
             return 1131;
         }
         return 32768;
-    }
-
-    private void readHintMaskBytes(int numBytes, StringBuilder s)
-    {
-        for (int i = 0; i < numBytes; i++) {
-            int b = readCard8();
-            s.append("0x").append(Integer.toHexString(b).toUpperCase()).append(' ');
-        }
-    }
-
-    private void rollUpOneStep(int n)
-    {
-        if (n <= 1) {
-            return;
-        }
-        float topElem = type2Stack[type2StackCount - 1];
-        int botIdx = type2StackCount - n;
-        for (int i = type2StackCount - 2; i >= botIdx; i--) {
-            type2Stack[i + 1] = type2Stack[i];
-        }
-        type2Stack[botIdx] = topElem;
-    }
-
-    private void rollDownOneStep(int n)
-    {
-        if (n <= 1) {
-            return;
-        }
-        int botIdx = type2StackCount - n;
-        float botElem = type2Stack[botIdx];
-        for (int i = botIdx; i + 1 < type2StackCount; i++) {
-            type2Stack[i] = type2Stack[i + 1];
-        }
-        type2Stack[type2StackCount - 1] = botElem;
     }
 
     /**
@@ -3776,7 +2914,7 @@ public class CFFDump
             }
             addError("Subroutine index out of bounds");
             input.position(posOrig);
-            return CHARSTRING_END_CONTINUE;
+            return Type2CharStringDump.CHARSTRING_END_CONTINUE;
         }
 
         int offSize = readOffSize();
@@ -3792,10 +2930,10 @@ public class CFFDump
         tmp.append(":\n");
 
         input.position(startOff);
-        int ret = executeCharString(tmp, gs, endOff, true);
+        int ret = type2Dumper.executeCharString(tmp, gs, endOff, true);
 
-        if (ret == CHARSTRING_END_RETURN) {
-            ret = CHARSTRING_END_CONTINUE;
+        if (ret == Type2CharStringDump.CHARSTRING_END_RETURN) {
+            ret = Type2CharStringDump.CHARSTRING_END_CONTINUE;
         }
 
         s.append("call").append(type).append("  % ").append(type).append("# ").append(subrNo);
@@ -3808,7 +2946,7 @@ public class CFFDump
         return ret;
     }
 
-    private int executeGlobalSubr(int subrNoUnbiased, StringBuilder s, GlyphStatus gs)
+    int executeGlobalSubr(int subrNoUnbiased, StringBuilder s, GlyphStatus gs)
     throws CFFParseException
     {
         int subrNo = subrNoUnbiased + globalSubrBias;
@@ -3820,7 +2958,7 @@ public class CFFDump
         return ret;
     }
 
-    private int executeLocalSubr(int subrNoUnbiased, StringBuilder s, GlyphStatus gs)
+    int executeLocalSubr(int subrNoUnbiased, StringBuilder s, GlyphStatus gs)
     throws CFFParseException
     {
         int localSubrINDEXOff = localSubrINDEXOffsets[gs.fdIndex];
@@ -3878,11 +3016,12 @@ public class CFFDump
             s.append(", subroutine bias: ").append(computeSubrBias(count)).append('\n');
         }
 
-        int curPos = input.position();
-        input.position(offset);
-        validateAndPrintINDEXOffsets(-1, 0, s, 0, 0, "Local Subr");
-        input.position(curPos);
-
+        if (count > 0) {
+            int curPos = input.position();
+            input.position(offset);
+            validateAndPrintINDEXOffsets(-1, 0, s, 0, 0, "Local Subr");
+            input.position(curPos);
+        }
         return s.toString();
     }
 
@@ -4022,16 +3161,7 @@ public class CFFDump
         return topDictFontBBox;
     }
 
-    private void invalidNumOperands(StringBuilder s, String op)
-    {
-        if (s.length() > 0 && s.charAt(s.length() - 1) == '\n') {
-            s.setLength(s.length() - 1);
-        }
-        s.append("  % ERROR! Invalid number of operands\n");
-        addError("Invalid number of operands for " + op);
-    }
-
-    private void addError(String msg)
+    void addError(String msg)
     {
         Integer count = errors.get(msg);
         if (count != null) {
@@ -4091,83 +3221,6 @@ public class CFFDump
             return 2;
         }
         return 1;
-    }
-
-    private class GlyphStatus
-    {
-        public final int gid;
-        public final int fdIndex;
-        public float width = 0;
-        public int stemHintCount = 0;
-        public boolean foundGlyphWidth = false;
-        public int subrLevel = 0;
-        public boolean widthWasPrinted = false;
-        private String widthString;
-
-        GlyphStatus(int gid, int fdIndex)
-        {
-            this.gid = gid;
-            this.fdIndex = fdIndex;
-        }
-
-        void setGlyphWidth(float w, StringBuilder s)
-        {
-            float nomWidthX = nominalWidths[fdIndex];
-            float actualWidth = w + nomWidthX;
-            this.width = actualWidth;
-            this.foundGlyphWidth = true;
-            widthString = "  % glyph width = " + doubleToString(w) +
-                " + nominalWidthX = " + doubleToString(actualWidth);
-
-            if (subrLevel == 0) {
-                s.append(widthString);
-                widthWasPrinted = true;
-            }
-            if (gidToWidth != null) {
-                gidToWidth.put(gid, actualWidth);
-            }
-        }
-
-        void setDefaultWidth(StringBuilder s)
-        {
-            float defaultWidthX = defaultWidths[fdIndex];
-            this.width = defaultWidthX;
-            this.foundGlyphWidth = true;
-            widthString = "  % glyph width = defaultWidthX = " + doubleToString(defaultWidthX);
-
-            if (subrLevel == 0) {
-                s.append(widthString);
-                widthWasPrinted = true;
-            }
-            if (gidToWidth != null) {
-                gidToWidth.put(gid, defaultWidthX);
-            }
-        }
-
-        void checkWidthFound(StringBuilder s, String op)
-        {
-            if (!foundGlyphWidth) {
-                if (s.length() > 0 && s.charAt(s.length() - 1) == '\n') {
-                    s.setLength(s.length() - 1);
-                }
-                s.append(
-                    "  % ERROR! Glyph width should have been specified before this operator\n");
-                addError("Glyph width missing");
-            }
-        }
-
-        void ensureWidthIsPrinted(StringBuilder s)
-        {
-            // Some fonts (like AGaramondPro-Regular.otf) specify glyph widths in subroutines.
-            // We defer printing the width until the subroutine has been executed. It's
-            // not a good idea to print the width in a subroutine dump because its value
-            // may vary depending on which glyph called the subroutine.
-
-            if (!widthWasPrinted && subrLevel == 0 && widthString != null) {
-                s.append("  ").append(widthString).append('\n');
-                widthWasPrinted = true;
-            }
-        }
     }
 
     private int[] getOffsetAndLengthOfSubroutine(int subrNo, boolean isLocal, int fdIdx)
