@@ -30,6 +30,7 @@ import javax.swing.JComboBox;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -41,7 +42,9 @@ import javax.swing.UIManager;
  */
 public class CFFDumpFrame extends JFrame implements ActionListener
 {
-    private final JButton buttonStart;
+    private JButton buttonStart;
+    private JButton buttonAbout;
+    private JButton buttonExit;
     private final JButton buttonChooseFile;
     private final JCheckBox checkBoxAnalyzeCharstrings;
     private final JComboBox comboInputType;
@@ -58,6 +61,7 @@ public class CFFDumpFrame extends JFrame implements ActionListener
     private static final String FILTER_FLATE = "/FlateDecode";
     private static final String FILTER_A85 = "/ASCII85Decode";
     private static final String FILTER_A85_FLATE = "[ /ASCII85Decode /FlateDecode ]";
+    private static final String FILTER_HEX = "/ASCIIHexDecode";
 
     public CFFDumpFrame()
     {
@@ -98,7 +102,8 @@ public class CFFDumpFrame extends JFrame implements ActionListener
                 FILTER_NONE,
                 FILTER_FLATE,
                 FILTER_A85,
-                FILTER_A85_FLATE
+                FILTER_A85_FLATE,
+                FILTER_HEX
             }
         );
         add(comboFilter, gc);
@@ -107,17 +112,14 @@ public class CFFDumpFrame extends JFrame implements ActionListener
         textFieldOffset = new JTextField("0", 20);
         add(textFieldOffset, gc);
 
-        checkBoxAnalyzeCharstrings = new JCheckBox("Analyze Charstrings and Subroutines", true);
+        checkBoxAnalyzeCharstrings = new JCheckBox("Analyze CharStrings and Subroutines", true);
         add(checkBoxAnalyzeCharstrings, gc);
 
         gc = new GridBagConstraints(0, GridBagConstraints.RELATIVE,
             2, 1, 1.0, 0.0, GridBagConstraints.FIRST_LINE_START,
             GridBagConstraints.HORIZONTAL, new Insets(2, 5, 2, 5), 0, 0);
-        buttonStart = new JButton("Analyze");
-        JPanel buttonPanel = new JPanel();
-        buttonPanel.add(buttonStart);
+        JPanel buttonPanel = createButtonPanel();
         add(buttonPanel, gc);
-        buttonStart.addActionListener(this);
 
         gc = new GridBagConstraints(0, GridBagConstraints.RELATIVE,
             2, 1, 1.0, 1.0, GridBagConstraints.FIRST_LINE_START,
@@ -174,6 +176,13 @@ public class CFFDumpFrame extends JFrame implements ActionListener
             boolean isPDFOrRaw = INPUT_TYPE_PDF_OR_RAW.equals(item);
             comboFilter.setEnabled(isPDFOrRaw);
             textFieldOffset.setEnabled(isPDFOrRaw);
+
+        } else if (source == buttonExit) {
+            System.exit(0);
+
+        } else if (source == buttonAbout) {
+            showAbout();
+
         }
     }
 
@@ -185,17 +194,12 @@ public class CFFDumpFrame extends JFrame implements ActionListener
             }
 
             Object fileType = comboInputType.getSelectedItem();
-            Object filter = comboFilter.getSelectedItem();
             String offset = INPUT_TYPE_PDF_OR_RAW.equals(fileType) ? textFieldOffset.getText() : "0";
-            boolean isA85 = FILTER_A85.equals(filter);
-            boolean isFlate = FILTER_FLATE.equals(filter);
-            boolean isA85Flate = FILTER_A85_FLATE.equals(filter);
 
             CFFDumpDataHandler handler = new CFFDumpDataHandler(
                 new File(textFieldFile.getText()),
                 INPUT_TYPE_OTF.equals(fileType),
-                isFlate || isA85Flate,
-                isA85 || isA85Flate,
+                getFilter(),
                 offset, checkBoxAnalyzeCharstrings.isSelected());
             String dump = handler.analyze();
             textAreaOutput.setText(dump);
@@ -210,6 +214,65 @@ public class CFFDumpFrame extends JFrame implements ActionListener
             }
             textAreaOutput.setText(message);
         }
+    }
+
+    private CFFDumpDataHandler.PDFFilter getFilter()
+    {
+        Object filter = comboFilter.getSelectedItem();
+
+        if (FILTER_A85.equals(filter)) {
+            return CFFDumpDataHandler.PDFFilter.ASCII85;
+        }
+        if (FILTER_FLATE.equals(filter)) {
+            return CFFDumpDataHandler.PDFFilter.FLATE;
+        }
+        if (FILTER_A85_FLATE.equals(filter)) {
+            return CFFDumpDataHandler.PDFFilter.ASCII85_FLATE;
+        }
+        if (FILTER_HEX.equals(filter)) {
+            return CFFDumpDataHandler.PDFFilter.ASCIIHEX;
+        }
+        return CFFDumpDataHandler.PDFFilter.NONE;
+    }
+
+    private JPanel createButtonPanel()
+    {
+        JPanel buttonPanel = new JPanel();
+
+        buttonStart = new JButton("Analyze");
+        buttonPanel.add(buttonStart);
+        buttonStart.addActionListener(this);
+
+        buttonAbout = new JButton("About");
+        buttonPanel.add(buttonAbout);
+        buttonAbout.addActionListener(this);
+
+        buttonExit = new JButton("Exit");
+        buttonPanel.add(buttonExit);
+        buttonExit.addActionListener(this);
+
+        return buttonPanel;
+    }
+
+    private void showAbout()
+    {
+        String text =
+            "CFFDump\n" +
+            "Copyright 2021 Jani Pehkonen\n" +
+            "Licensed under the Apache License, Version 2.0 (the \"License\");\n" +
+            "you may not use this file except in compliance with the License.\n" +
+            "You may obtain a copy of the License at\n" +
+            "\n" +
+            "    http://www.apache.org/licenses/LICENSE-2.0\n" +
+            "\n" +
+            "Unless required by applicable law or agreed to in writing, software\n" +
+            "distributed under the License is distributed on an \"AS IS\" BASIS,\n" +
+            "WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n" +
+            "See the License for the specific language governing permissions and\n" +
+            "limitations under the License.";
+
+        JOptionPane.showMessageDialog(this, text, "About CFFDump",
+            JOptionPane.INFORMATION_MESSAGE);
     }
 
 }

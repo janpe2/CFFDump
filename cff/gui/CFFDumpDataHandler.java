@@ -15,6 +15,7 @@
 
 package cff.gui;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -25,21 +26,28 @@ import cff.io.ASCII85DecoderStream;
 
 public class CFFDumpDataHandler
 {
+    public static enum PDFFilter
+    {
+        NONE,
+        ASCII85,
+        FLATE,
+        ASCII85_FLATE,
+        ASCIIHEX
+    }
+
     private final File file;
     private final boolean isOTF;
-    private final boolean isFlate;
-    private final boolean isA85;
+    private final PDFFilter filter;
     private final int fileOffset;
     private final boolean analyzeCharstrings;
 
-    CFFDumpDataHandler(File file, boolean isOTF, boolean isFlate, boolean isA85,
-    String fileOffset, boolean analyzeCharstrings)
+    CFFDumpDataHandler(File file, boolean isOTF, PDFFilter filter, String fileOffset,
+    boolean analyzeCharstrings)
     throws NumberFormatException
     {
         this.file = file;
         this.isOTF = isOTF;
-        this.isFlate = isFlate;
-        this.isA85 = isA85;
+        this.filter = filter;
         this.fileOffset = Integer.parseInt(fileOffset);
         this.analyzeCharstrings = analyzeCharstrings;
     }
@@ -90,16 +98,20 @@ public class CFFDumpDataHandler
         }
     }
 
-    private InputStream applyFilters(InputStream is)
+    private InputStream applyFilters(InputStream is) throws IOException
     {
-        if (isFlate && isA85) {
-            return new InflaterInputStream(new ASCII85DecoderStream(is));
-        }
-        if (isFlate) {
-            return new InflaterInputStream(is);
-        }
-        if (isA85) {
-            return new ASCII85DecoderStream(is);
+        switch (filter) {
+            case NONE:
+                return is;
+            case ASCII85:
+                return new ASCII85DecoderStream(is);
+            case FLATE:
+                return new InflaterInputStream(is);
+            case ASCII85_FLATE:
+                return new InflaterInputStream(new ASCII85DecoderStream(is));
+            case ASCIIHEX:
+                byte[] bytes = CFFDump.hexToBytes(is);
+                return new ByteArrayInputStream(bytes);
         }
         return is;
     }
