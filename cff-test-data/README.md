@@ -9,7 +9,7 @@ A CIDFont that has a `charset` of 0 (ISOAdobe), which is an error. CIDFonts must
 `CIDFont-FD-FontMatrix.cff`
 A CIDFont whose Font DICT contains the entry `/FontMatrix [.00048828125 0 0 .00048828125 0 0]`.
 
-`embedded-deflate.pdf`
+`embedded-deflate-offset_2243.pdf`
 This PDF file contains an embedded CFF font. the data starts at file offset 2243 and it has been compressed by deflate. Thus the needed options are `-deflate -start 2243`.
 
 `encoding-format-1.cff`
