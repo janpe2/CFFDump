@@ -258,7 +258,7 @@ public class CFFDumpFrame extends JFrame implements ActionListener
     {
         String text =
             "CFFDump\n" +
-            "Copyright 2021 Jani Pehkonen\n" +
+            "Copyright 2023 Jani Pehkonen\n" +
             "Licensed under the Apache License, Version 2.0 (the \"License\");\n" +
             "you may not use this file except in compliance with the License.\n" +
             "You may obtain a copy of the License at\n" +
