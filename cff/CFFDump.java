@@ -1,4 +1,4 @@
-/* Copyright 2021 Jani Pehkonen
+/* Copyright 2023 Jani Pehkonen
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -157,6 +157,12 @@ public class CFFDump
      * This contains only one entry for a base font.
      */
     float[] defaultWidths;
+
+    /**
+     * If true, dump Charset, Encoding, FDSelect, and offset arrays in long format.
+     * Otherwise, dump them in wide format.
+     */
+    private boolean isLongFormat;
 
     /**
      * Dumps of local subroutines. The indices of the outer list are FD indices
@@ -391,6 +397,7 @@ public class CFFDump
         boolean enableCharstringsDump = false;
         boolean isGUI = false;
         boolean enableOffsetsDump = false;
+        boolean isLongFormat = false;
         int filter = FILTER_NONE;
         int startOffset = 0;
         String singleGlyph = null;
@@ -425,6 +432,8 @@ public class CFFDump
                 isGUI = true;
             } else if (arg.equals("-offsets")) {
                 enableOffsetsDump = true;
+            } else if (arg.equals("-long")) {
+                isLongFormat = true;
             } else if (file == null) {
                 file = args[i];
             } else {
@@ -454,6 +463,7 @@ public class CFFDump
 
         dumper.enableDumpingCharstringsAndSubrs(enableCharstringsDump);
         dumper.enableDumpingOffsetArrays(enableOffsetsDump);
+        dumper.setLongFormat(isLongFormat);
         if (singleGlyph != null) {
             dumper.dumpOnlyOneCharstring(singleGlyph);
         }
@@ -483,6 +493,8 @@ public class CFFDump
             "                   <id> is a glyph index (e.g. 25), a glyph name\n" +
             "                   (e.g. /exclam) or a CID (e.g. CID1200).\n" +
             "  -offsets         Dump offset arrays of INDEXes.\n" +
+            "  -long            Use long dump format in Charset, Encoding, FDSelect,\n" +
+            "                   and offset arrays of INDEXes.\n" +
             "  <input_file>     Input file to be analyzed.\n"
         );
         System.exit(1);
@@ -1753,7 +1765,7 @@ public class CFFDump
                 s.append(" = ");
                 printPadded(Integer.toString(offset), -1, s, maxOffsetStringLength);
                 s.append(' ');
-                columnCounter++;
+                columnCounter += incrementColumnCounter(i == count);
                 if (columnCounter >= numColumns) {
                     s.append("\n    ");
                     columnCounter = 0;
@@ -2092,7 +2104,7 @@ public class CFFDump
             String glyphName = (isCIDFont ? "CID " : "/") + charset[gid];
             printPadded(glyphName, ',', s, maxGlyphNameLength);
             s.append(' ');
-            columnCounter++;
+            columnCounter += incrementColumnCounter(gid == numGlyphs - 1);
             if (columnCounter >= numColumns) {
                 s.append("\n  ");
                 columnCounter = 0;
@@ -2230,7 +2242,7 @@ public class CFFDump
             s.append(" = /");
             printPadded(glyphName, ',', s, maxGlyphNameLength);
             s.append(' ');
-            columnCounter++;
+            columnCounter += incrementColumnCounter(i == nCodes - 1);
 
             if (columnCounter >= numColumns) {
                 s.append("\n  ");
@@ -2263,7 +2275,7 @@ public class CFFDump
                 s.append(" = /");
                 printPadded(glyphName, ',', s, maxGlyphNameLength);
                 s.append(' ');
-                columnCounter++;
+                columnCounter += incrementColumnCounter(i == nRanges - 1);
 
                 if (columnCounter >= numColumns) {
                     s.append("\n  ");
@@ -2294,7 +2306,7 @@ public class CFFDump
             s.append(" = /");
             printPadded(glyphName, ',', s, maxGlyphNameLength);
             s.append(' ');
-            columnCounter++;
+            columnCounter += incrementColumnCounter(i == nSups - 1);
 
             if (columnCounter >= numColumns) {
                 s.append("\n  ");
@@ -2446,6 +2458,12 @@ public class CFFDump
         return sidToString(sid);
     }
 
+    private int incrementColumnCounter(boolean isLast)
+    {
+        final int LONG_FORMAT_LARGE_VALUE = 1000000;
+        return isLongFormat && !isLast ? LONG_FORMAT_LARGE_VALUE : 1;
+    }
+
     private String arrayGet(String[] arr, int idx)
     {
         if (arr == null) {
@@ -2540,7 +2558,7 @@ public class CFFDump
             s.append(" = ");
             printPadded(Integer.toString(fdIdx), ',', s, maxFDLength);
             s.append(' ');
-            columnCounter++;
+            columnCounter += incrementColumnCounter(gid == numGlyphs - 1);
 
             if (columnCounter >= numColumns) {
                 s.append("\n  ");
@@ -3261,4 +3279,17 @@ public class CFFDump
         return offArrStart + offSize * (count + 1) - 1;
     }
 
+    /**
+     * Sets long or wide dump format for Charset, Encoding, FDSelect, and
+     * offset arrays of INDEXes.
+     * If long format is enabled, the mentioned blocks are dumped one entry on each line.
+     * If wide format is enabled, the blocks are dumped many entries
+     * per line as long as a reasonable line length is achieved.
+     *
+     * @param b true for long format, false for wide format
+     */
+    public void setLongFormat(boolean b)
+    {
+        isLongFormat = b;
+    }
 }
