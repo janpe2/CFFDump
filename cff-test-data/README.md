@@ -38,3 +38,12 @@ Encoding contains a Supplemental encoding, which allows to encode one glyph name
 
 `global_subrs.cff`
 Contains a non-empty `Global Subr INDEX`. This font also has some local and global subroutines that are never used.
+
+`error-operator-9.cff`
+Invalid operator 9 appears repeatedly in charstrings. All numbers in charstrings have been stored very inefficiently as 5-byte sequences (255 + fixed-point 16.16).
+
+`header-size-12.cff`
+Header size (hdrSize) is 12 instead of the usual value 4. This is a CIDFont with Japan1 ordering and four DICTs in FDArray.
+
+`special-ops.cff`
+Special operators in charstrings: add, mul, exch, roll, ifelse.
