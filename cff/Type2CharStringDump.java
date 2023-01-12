@@ -866,7 +866,8 @@ class Type2CharStringDump
             num = -256 * (v - 251) - w - 108;
         } else if (v == 255) {
             double fixed = readT2Int() / 65536.0;
-            s.append(fixed);
+            double roundEightDecimals = Math.round(fixed * 1e8) / 1e8;
+            s.append(roundEightDecimals);
             s.append(' ');
             t2Push((float)fixed);
             return;
