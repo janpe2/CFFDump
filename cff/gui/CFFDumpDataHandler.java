@@ -52,7 +52,7 @@ public class CFFDumpDataHandler
         this.analyzeCharstrings = analyzeCharstrings;
     }
 
-    String analyze() throws IOException
+    DumpResult analyze() throws IOException
     {
         CFFDump cffDump;
         InputStream is = null;
@@ -89,7 +89,7 @@ public class CFFDumpDataHandler
                 }
             }
 
-            return dump;
+            return new DumpResult(dump, cffDump.hasErrors());
 
         } finally {
             if (is != null) {
@@ -114,5 +114,17 @@ public class CFFDumpDataHandler
                 return new ByteArrayInputStream(bytes);
         }
         return is;
+    }
+
+    public static class DumpResult
+    {
+        public final String dump;
+        public final boolean hasErrors;
+
+        public DumpResult(String dump, boolean hasErrors)
+        {
+            this.dump = dump;
+            this.hasErrors = hasErrors;
+        }
     }
 }

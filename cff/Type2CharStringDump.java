@@ -778,7 +778,6 @@ class Type2CharStringDump
         input.limit(endOffset);
 
         s.append(CHARSTRING_INDENT);
-        int lastOperator = -1;
         int returnValue = CHARSTRING_END_CONTINUE;
 
         while (input.position() < endOffset) {
@@ -798,7 +797,6 @@ class Type2CharStringDump
                 if (b == -1) {
                     break;
                 }
-                lastOperator = (12 << 8) | b;
                 type2EscapedOperator(b, s, gs);
                 s.append(CHARSTRING_INDENT);
             } else if (b == 28) {
@@ -812,7 +810,6 @@ class Type2CharStringDump
                 s.append(' ');
             } else {
                 // Commands {@code endchar} and {@code return} finish this charstring analysis
-                lastOperator = b;
                 int ret = type2Operator(b, s, gs);
                 if (ret != CHARSTRING_END_CONTINUE) {
                     returnValue = ret;

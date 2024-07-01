@@ -18,6 +18,12 @@ Encoding block has format 1. Charset block has format 1.
 `flex-and-hintmask.cff`
 Flex segments and hintmasks.
 
+`no-private.cff`
+A font whose Top DICT has no `Private` entry. That is an error. However, it would be useful if the dumper could show the contents of the whole font instead of stopping at the error.
+
+`no-private-CIDFont.cff`
+A CIDFont whose Font DICT has no `Private` entry.
+
 `opentype.otf`
 A simplistic OpenType font with CFF data. Thus the needed option is `-otf`.
 

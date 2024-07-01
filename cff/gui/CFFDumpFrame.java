@@ -36,6 +36,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.UIManager;
+import static cff.CFFDump.DUMPER_VERSION;
 
 /**
  * Main GUI frame.
@@ -201,9 +202,14 @@ public class CFFDumpFrame extends JFrame implements ActionListener
                 INPUT_TYPE_OTF.equals(fileType),
                 getFilter(),
                 offset, checkBoxAnalyzeCharstrings.isSelected());
-            String dump = handler.analyze();
-            textAreaOutput.setText(dump);
+            CFFDumpDataHandler.DumpResult result = handler.analyze();
+            textAreaOutput.setText(result.dump);
             textAreaOutput.setCaretPosition(0);
+            if (result.hasErrors) {
+                JOptionPane.showMessageDialog(this,
+                    "There were one or more errors. See end of dump.", "CFF Errors",
+                    JOptionPane.INFORMATION_MESSAGE);
+            }
 
         } catch (Exception ex) {
             String message = ex.getMessage();
@@ -257,8 +263,8 @@ public class CFFDumpFrame extends JFrame implements ActionListener
     private void showAbout()
     {
         String text =
-            "CFFDump\n" +
-            "Copyright 2023 Jani Pehkonen\n" +
+            "CFFDump " + DUMPER_VERSION + "\n" +
+            "Copyright 2024 Jani Pehkonen\n" +
             "Licensed under the Apache License, Version 2.0 (the \"License\");\n" +
             "you may not use this file except in compliance with the License.\n" +
             "You may obtain a copy of the License at\n" +

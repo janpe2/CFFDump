@@ -100,6 +100,8 @@ public class CFFDump
     private String fontDictIdxDump;
     private Type2CharStringDump type2Dumper;
 
+    public static final String DUMPER_VERSION = "1.3.0";
+
     /**
      * Data is not encoded nor compressed.
      */
@@ -401,6 +403,7 @@ public class CFFDump
         int filter = FILTER_NONE;
         int startOffset = 0;
         String singleGlyph = null;
+        boolean version = false;
 
         for (int i = 0, numArgs = args.length; i < numArgs; i++) {
             String arg = args[i];
@@ -434,6 +437,8 @@ public class CFFDump
                 enableOffsetsDump = true;
             } else if (arg.equals("-long")) {
                 isLongFormat = true;
+            } else if (arg.equals("-version")) {
+                version = true;
             } else if (file == null) {
                 file = args[i];
             } else {
@@ -441,6 +446,11 @@ public class CFFDump
             }
         }
 
+        if (version) {
+            System.out.println("CFFDump version " + DUMPER_VERSION);
+            System.exit(0);
+            return;
+        }
         if (isGUI) {
             CFFDumpFrame.launchGUI();
             return;
@@ -483,18 +493,19 @@ public class CFFDump
             "Usage:\n" +
             "java -jar CFFDump.jar [options] <input_file>\n" +
             "Options:\n" +
-            "  -otf             Input is an OpenType (.otf) font with CFF outlines.\n" +
-            "  -deflate         Input data is compressed by deflate.\n" +
-            "  -hex             Input data is ASCII hex encoded.\n" +
             "  -c               Enable dump of all charstrings and subroutines.\n" +
-            "  -gui             Use graphical user interface.\n" +
-            "  -start <offset>  Start offset of input data. Default: 0.\n" +
+            "  -deflate         Input data is compressed by deflate.\n" +
             "  -g <id>          Dump only the charstring of the specified glyph.\n" +
             "                   <id> is a glyph index (e.g. 25), a glyph name\n" +
             "                   (e.g. /exclam) or a CID (e.g. CID1200).\n" +
-            "  -offsets         Dump offset arrays of INDEXes.\n" +
+            "  -gui             Use graphical user interface.\n" +
+            "  -hex             Input data is ASCII hex encoded.\n" +
             "  -long            Use long dump format in Charset, Encoding, FDSelect,\n" +
             "                   and offset arrays of INDEXes.\n" +
+            "  -offsets         Dump offset arrays of INDEXes.\n" +
+            "  -otf             Input is an OpenType (.otf) font with CFF outlines.\n" +
+            "  -start <offset>  Start offset of input data. Default: 0.\n" +
+            "  -version         Print dumper version and exit.\n" +
             "  <input_file>     Input file to be analyzed.\n"
         );
         System.exit(1);
@@ -2324,11 +2335,18 @@ public class CFFDump
     private void loadPrivateDict(HashMap<String,String> fontDict, String heading,
     boolean printDivider, int privateDictNo) throws CFFParseException
     {
-        int privateOffset = dictGetInt(fontDict, KEY_PRIVATE_OFFSET, NO_DEFAULT);
-        int privateSize = dictGetInt(fontDict, KEY_PRIVATE_SIZE, NO_DEFAULT);
+        int privateOffset = dictGetInt(fontDict, KEY_PRIVATE_OFFSET, -1);
+        int privateSize = dictGetInt(fontDict, KEY_PRIVATE_SIZE, -1);
         printSectionHeading(heading, privateOffset, privateDictsDump, printDivider);
 
-        if (privateSize == 0) {
+        if (privateSize <= 0) {
+            if (privateSize == -1) {
+                String privateError = "Private DICT is required";
+                if (isCIDFont) {
+                    privateError = privateError + " in Font DICT #" + privateDictNo;
+                }
+                addError(privateError);
+            }
             privateDictsDump.append(
             "  <<\n" +
             "    % This private DICT is empty, so the following default entries are used:\n" +
@@ -2688,28 +2706,6 @@ public class CFFDump
             s.append("    % ERROR: Glyph does not end with 'endchar'\n");
             addError("Glyph does not end with 'endchar'");
         }
-    }
-
-    /**
-     * Prints a "heading". For example:
-     * <pre>
-     * --------------------
-     * Font Frutiger-Italic
-     * --------------------
-     * </pre>
-     */
-    private void printFontDumpHeading(String fontName, StringBuilder s)
-    {
-        int numDashes = (isCIDFont ? 8 : 5) + fontName.length();
-        for (int i = 0; i < numDashes; i++) {
-            s.append('-');
-        }
-        s.append('\n');
-        s.append(isCIDFont ? "CIDFont " : "Font ").append(fontName).append('\n');
-        for (int i = 0; i < numDashes; i++) {
-            s.append('-');
-        }
-        s.append('\n');
     }
 
     private void appendMessages()
