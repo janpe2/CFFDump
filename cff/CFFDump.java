@@ -1,4 +1,4 @@
-/* Copyright 2023 Jani Pehkonen
+/* Copyright 2025 Jani Pehkonen
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import java.util.zip.InflaterInputStream;
-import cff.gui.CFFDumpFrame;
+import cff.io.Filters;
 
 /**
  * Reads CFF (Compact Font Format) data and dumps it in ASCII form.
@@ -99,24 +99,11 @@ public class CFFDump
     private String fdSelectDump;
     private String fontDictIdxDump;
     private Type2CharStringDump type2Dumper;
+    private boolean enableDumpingUnusedSubrs;
+    private boolean silenceNumOperandsErrorsInUnusedSubr;
+    private boolean hasAnyNumOperandsErrorsInUnusedSubrs;
 
-    public static final String DUMPER_VERSION = "1.3.0";
-
-    /**
-     * Data is not encoded nor compressed.
-     */
-    public static final int FILTER_NONE = 0;
-
-    /**
-     * Data is compressed with the deflate algorithm.
-     * PDF filter {@code FlateDecode}.
-     */
-    public static final int FILTER_DEFLATE = 1;
-
-    /**
-     * Data is encoded with ASCII hex.
-     */
-    public static final int FILTER_ASCII_HEX = 2;
+    public static final String DUMPER_VERSION = "2.0.0";
 
     /**
      * The contents of the String INDEX, the non-standard strings.
@@ -388,129 +375,6 @@ public class CFFDump
     };
     */
 
-    public static void main(String[] args) throws IOException
-    {
-        if (args.length < 1 || args.length > 8) {
-            printUsage();
-        }
-
-        String file = null;
-        boolean isOpenType = false;
-        boolean enableCharstringsDump = false;
-        boolean isGUI = false;
-        boolean enableOffsetsDump = false;
-        boolean isLongFormat = false;
-        int filter = FILTER_NONE;
-        int startOffset = 0;
-        String singleGlyph = null;
-        boolean version = false;
-
-        for (int i = 0, numArgs = args.length; i < numArgs; i++) {
-            String arg = args[i];
-            if (arg.equals("-start")) {
-                if (i + 1 >= numArgs) {
-                    printUsage();
-                }
-                i++;
-                try {
-                    startOffset = Integer.parseInt(args[i]);
-                } catch (NumberFormatException nfe) {
-                    printUsage();
-                }
-            } else if (arg.equals("-g")) {
-                if (i + 1 >= numArgs) {
-                    printUsage();
-                }
-                i++;
-                singleGlyph = args[i];
-            } else if (arg.equals("-otf")) {
-                isOpenType = true;
-            } else if (arg.equals("-deflate")) {
-                filter = FILTER_DEFLATE;
-            } else if (arg.equals("-hex")) {
-                filter = FILTER_ASCII_HEX;
-            } else if (arg.equals("-c")) {
-                enableCharstringsDump = true;
-            } else if (arg.equals("-gui") || arg.equals("gui")) {
-                isGUI = true;
-            } else if (arg.equals("-offsets")) {
-                enableOffsetsDump = true;
-            } else if (arg.equals("-long")) {
-                isLongFormat = true;
-            } else if (arg.equals("-version")) {
-                version = true;
-            } else if (file == null) {
-                file = args[i];
-            } else {
-                printUsage();
-            }
-        }
-
-        if (version) {
-            System.out.println("CFFDump version " + DUMPER_VERSION);
-            System.exit(0);
-            return;
-        }
-        if (isGUI) {
-            CFFDumpFrame.launchGUI();
-            return;
-        }
-        if (file == null) {
-            printUsage();
-        }
-        if (isOpenType && filter != FILTER_NONE) {
-            System.out.println("Filters cannot be applied to OpenType fonts.");
-            System.exit(1);
-        }
-
-        CFFDump dumper;
-
-        if (isOpenType) {
-            dumper = createOTFDumper(new File(file));
-        } else {
-            dumper = new CFFDump(new File(file), startOffset, filter);
-        }
-
-        dumper.enableDumpingCharstringsAndSubrs(enableCharstringsDump);
-        dumper.enableDumpingOffsetArrays(enableOffsetsDump);
-        dumper.setLongFormat(isLongFormat);
-        if (singleGlyph != null) {
-            dumper.dumpOnlyOneCharstring(singleGlyph);
-        }
-
-        dumper.parseCFF();
-
-        String dump = dumper.getResult();
-        if (dumper.hasErrors()) {
-            dump += "\nThere we errors:\n" + dumper.getErrors();
-        }
-        System.out.println(dump);
-    }
-
-    private static void printUsage()
-    {
-        System.err.println(
-            "Usage:\n" +
-            "java -jar CFFDump.jar [options] <input_file>\n" +
-            "Options:\n" +
-            "  -c               Enable dump of all charstrings and subroutines.\n" +
-            "  -deflate         Input data is compressed by deflate.\n" +
-            "  -g <id>          Dump only the charstring of the specified glyph.\n" +
-            "                   <id> is a glyph index (e.g. 25), a glyph name\n" +
-            "                   (e.g. /exclam) or a CID (e.g. CID1200).\n" +
-            "  -gui             Use graphical user interface.\n" +
-            "  -hex             Input data is ASCII hex encoded.\n" +
-            "  -long            Use long dump format in Charset, Encoding, FDSelect,\n" +
-            "                   and offset arrays of INDEXes.\n" +
-            "  -offsets         Dump offset arrays of INDEXes.\n" +
-            "  -otf             Input is an OpenType (.otf) font with CFF outlines.\n" +
-            "  -start <offset>  Start offset of input data. Default: 0.\n" +
-            "  -version         Print dumper version and exit.\n" +
-            "  <input_file>     Input file to be analyzed.\n"
-        );
-        System.exit(1);
-    }
-
     /**
      * Constructs a new CFF parser thats reads from a file.
      * If an OpenType font file is specified, {@code startOffset} must specify
@@ -583,11 +447,11 @@ public class CFFDump
                 is.skip(startOffset);
             }
 
-            if (filter == FILTER_DEFLATE) {
+            if (filter == Filters.FILTER_DEFLATE) {
                 is = new InflaterInputStream(is);
             }
 
-            if (filter == FILTER_ASCII_HEX) {
+            if (filter == Filters.FILTER_ASCII_HEX) {
                 array = hexToBytes(is);
             } else {
                 array = inputToBytes(is);
@@ -916,12 +780,7 @@ public class CFFDump
         for (int gsubrNo = 0; gsubrNo < gsubrCount; gsubrNo++) {
             String gsubr = globalSubrDumps[gsubrNo];
             if (gsubr == null) {
-                int[] offLen = getOffsetAndLengthOfSubroutine(gsubrNo, false, 0);
-                sbMain.append("  [").append(gsubrNo).append("] ");
-                printOffset(offLen[0], sbMain);
-                sbMain.append(":\n");
-                sbMain.append("    <This global subroutine is never called. Unable to dump. Length is ").
-                    append(offLen[1]).append(" bytes.>\n");
+                dumpUnusedSubroutine(gsubrNo, 0, false);
                 unusedGlobalSubrs++;
             } else {
                 sbMain.append(gsubr);
@@ -949,12 +808,14 @@ public class CFFDump
             sbMain.append("  <No local subroutines>\n");
             return;
         }
-        if (localSubrs == null || localSubrs.isEmpty()) {
+        /*
+        if ((localSubrs == null || localSubrs.isEmpty()) && !enableDumpingUnusedSubrs) {
             // We don't have any dumps in this INDEX. It is possible that a font has
             // some subroutines but no charstring ever calls them.
             sbMain.append("  <Local subroutines are never called or dumping is disabled>\n");
             return;
         }
+        */
         if (!dumpCharstringsAndSubrs) {
             sbMain.append("  <Subroutine dumping is disabled>\n");
             return;
@@ -963,17 +824,74 @@ public class CFFDump
         for (int lsubrNo = 0; lsubrNo < count; lsubrNo++) {
             String lsubr = (lsubrNo < localSubrs.size()) ? localSubrs.get(lsubrNo) : null;
             if (lsubr == null) {
-                int[] offLen = getOffsetAndLengthOfSubroutine(lsubrNo, true, fdIdx);
-                sbMain.append("  [").append(lsubrNo).append("] ");
-                printOffset(offLen[0], sbMain);
-                sbMain.append(":\n");
-                sbMain.append("    <This subroutine is never called. Unable to dump. Length is ").
-                    append(offLen[1]).append(" bytes.>\n");
+                dumpUnusedSubroutine(lsubrNo, fdIdx, true);
                 unusedLocalSubrs++;
             } else {
                 sbMain.append(lsubr);
             }
         }
+    }
+
+    private void dumpUnusedSubroutine(int subrNo, int fdIdx, boolean isLocal)
+    {
+        try {
+            // Unused subroutines often have an invalid number of operands when
+            // they are dumped without executing them because the actual operands
+            // cannot be obtained from the caller. Thus silence those errors.
+            silenceNumOperandsErrorsInUnusedSubr = true;
+
+            int[] offLen = getOffsetAndLengthOfSubroutine(subrNo, isLocal, fdIdx);
+            int offset = offLen[0], length = offLen[1];
+            if (length <= 0) {
+                printTitleForSubr(subrNo, offset, sbMain);
+                sbMain.append("    <This subroutine has 0 bytes.>\n");
+                return;
+            }
+            if (!enableDumpingUnusedSubrs) {
+                printTitleForSubr(subrNo, offset, sbMain);
+                sbMain.append("    <This subroutine is never called. Unable to dump. Length is ")
+                    .append(length).append(" bytes.>\n");
+                return;
+            }
+
+            String unusedInfo = "    % <This subroutine is never called. Length is " +
+                length + " bytes.>\n";
+            StringBuilder tmp = new StringBuilder();
+            GlyphStatus gs = new GlyphStatus(-1, fdIdx, this);
+            gs.widthWasPrinted = true;
+            gs.isUnusedSubr = true;
+            type2Dumper.clearType2Stack();
+            type2Dumper.foundEndChar = false;
+            if (isLocal) {
+                executeLocalSubr(subrNo, tmp, gs, true, unusedInfo);
+            } else {
+                executeGlobalSubr(subrNo, tmp, gs, true, unusedInfo);
+            }
+            String subrDump = "";
+            if (isLocal) {
+                ArrayList<String> subrsForFD =
+                    fdIdx < localSubrDumps.size() ? localSubrDumps.get(fdIdx) : null;
+                subrDump = subrsForFD != null && subrNo < subrsForFD.size()
+                    ? subrsForFD.get(subrNo)
+                    : "";
+            } else {
+                subrDump = globalSubrDumps[subrNo];
+            }
+            sbMain.append(subrDump);
+
+        } catch (Exception ex) {
+            sbMain.append("    <Dump failed>\n");
+            System.out.println(ex);
+        } finally {
+            silenceNumOperandsErrorsInUnusedSubr = false;
+        }
+    }
+
+    private void printTitleForSubr(int subrNo, int offset, StringBuilder s)
+    {
+        s.append("  [").append(subrNo).append("] ");
+        printOffset(offset, s);
+        s.append(":\n");
     }
 
     private void pushDictInt(int intValue)
@@ -1607,7 +1525,7 @@ public class CFFDump
             case 15:
                 // Operator 12 15 is -Reserved- in the current CFF spec. The previous
                 // version of the spec (1998) defines this code as ForceBoldThreshold.
-                // See MyriadMM_565_600_.cff (from PS_3010-3011.Supplement.pdf).
+                // See MM-snapshot.cff (from PS_3010-3011.Supplement.pdf).
                 addError("DICT entry ForceBoldThreshold (12 15) is outdated");
                 s.append("    /ForceBoldThreshold ").append(popDictValue()).append("  % ERROR!\n");
                 break;
@@ -2751,6 +2669,23 @@ public class CFFDump
             sbMain.append("Info: Font contains flex segments\n");
             hasInfo = true;
         }
+        if (type2Dumper.unusedSubrDumpInterruptedByHintmask) {
+            sbMain.append(
+                "Info: When dumping subroutines that are never called, hintmask or cntrmask was\n" +
+                "      encountered and subroutine dump was truncated. The number of mask bytes\n" +
+                "      following those operators cannot be known reliably if subroutine\n" +
+                "      is never called.\n"
+            );
+            hasInfo = true;
+        }
+        if (hasAnyNumOperandsErrorsInUnusedSubrs) {
+            sbMain.append(
+                "Info: There were one or more \"" + Type2CharStringDump.INVALID_NUM_OPERANDS_TEXT + "\" errors\n" +
+                "      in unused subroutines. These might not be real errors but they\n" +
+                "      are the side effect of dumping subroutines without calling them.\n"
+            );
+            hasInfo = true;
+        }
 
         if (!hasInfo) {
             sbMain.append("<None>\n");
@@ -2911,7 +2846,8 @@ public class CFFDump
      * {@code type} is String "subr" or "gsubr".
      */
     private int executeSubr(int subrNo, int subrINDEXOffset, StringBuilder tmp,
-    String type, StringBuilder s, boolean isLocal, GlyphStatus gs) throws CFFParseException
+    String type, StringBuilder s, boolean isLocal, GlyphStatus gs,
+    boolean isUnused, String unusedInfo) throws CFFParseException
     {
         int posOrig = input.position();
         unlimit();
@@ -2939,49 +2875,55 @@ public class CFFDump
         int endOff = readOffset(offSize) + offRef;
         // int len = endOff - startOff;
 
-        tmp.append("  [").append(subrNo).append("] ");
-        printOffset(startOff, tmp);
-        tmp.append(":\n");
+        printTitleForSubr(subrNo, startOff, tmp);
+        if (isUnused && unusedInfo != null) {
+            tmp.append(unusedInfo);
+        }
 
         input.position(startOff);
-        int ret = type2Dumper.executeCharString(tmp, gs, endOff, true);
+        int ret = type2Dumper.executeCharString(tmp, gs, endOff, isUnused);
 
         if (ret == Type2CharStringDump.CHARSTRING_END_RETURN) {
             ret = Type2CharStringDump.CHARSTRING_END_CONTINUE;
         }
 
-        s.append("call").append(type).append("  % ").append(type).append("# ").append(subrNo);
-        if (isLocal && isCIDFont) {
-            s.append(" (FD #").append(gs.fdIndex).append(')');
+        if (!isUnused) {
+            s.append("call").append(type).append("  % ").append(type).append("# ").append(subrNo);
+            if (isLocal && isCIDFont) {
+                s.append(" (FD #").append(gs.fdIndex).append(')');
+            }
+            s.append('\n');
         }
-        s.append('\n');
-
         input.position(posOrig);
         return ret;
     }
 
-    int executeGlobalSubr(int subrNoUnbiased, StringBuilder s, GlyphStatus gs)
-    throws CFFParseException
+    int executeGlobalSubr(int subrNo, StringBuilder s, GlyphStatus gs, boolean isUnused,
+    String unusedInfo) throws CFFParseException
     {
-        int subrNo = subrNoUnbiased + globalSubrBias;
+        subrNo = subrNo + (isUnused ? 0 : globalSubrBias);
         StringBuilder tmp = new StringBuilder(); // subroutine charstring is dumped into this
 
-        int ret = executeSubr(subrNo, globalSubrINDEXOffset, tmp, "gsubr", s, false, gs);
+        int ret = executeSubr(
+            subrNo, globalSubrINDEXOffset, tmp, "gsubr", s, false, gs, isUnused, unusedInfo
+        );
 
         globalSubrDumps[subrNo] = tmp.toString();
         return ret;
     }
 
-    int executeLocalSubr(int subrNoUnbiased, StringBuilder s, GlyphStatus gs)
-    throws CFFParseException
+    int executeLocalSubr(int subrNo, StringBuilder s, GlyphStatus gs, boolean isUnused,
+    String unusedInfo) throws CFFParseException
     {
         int localSubrINDEXOff = localSubrINDEXOffsets[gs.fdIndex];
         int count = localSubrCounts[gs.fdIndex];
-        int localsubrBias = computeSubrBias(count);
-        int subrNo = subrNoUnbiased + localsubrBias;
+        int localsubrBias = isUnused ? 0 : computeSubrBias(count);
+        subrNo = subrNo + localsubrBias;
         StringBuilder tmp = new StringBuilder(); // subroutine charstring is dumped into this
 
-        int ret = executeSubr(subrNo, localSubrINDEXOff, tmp, "subr", s, true, gs);
+        int ret = executeSubr(
+            subrNo, localSubrINDEXOff, tmp, "subr", s, true, gs, isUnused, unusedInfo
+        );
 
         ArrayList<String> list = localSubrDumps.get(gs.fdIndex);
         while (subrNo >= list.size()) {
@@ -3139,6 +3081,9 @@ public class CFFDump
 
     /**
      * Returns glyph advance widths. The keys are glyph indices.
+     * The result is available only if
+     * {@link #enableStoringCharsetAndMetrics enableStoringCharsetAndMetrics()}
+     * was called before starting the dumping. Otherwise this returns null.
      */
     public HashMap<Integer,Float> getGlyphWidths()
     {
@@ -3177,6 +3122,13 @@ public class CFFDump
 
     void addError(String msg)
     {
+        if (
+            silenceNumOperandsErrorsInUnusedSubr &&
+            msg.indexOf(Type2CharStringDump.INVALID_NUM_OPERANDS_TEXT) > -1
+        ) {
+            hasAnyNumOperandsErrorsInUnusedSubrs = true;
+            return;
+        }
         Integer count = errors.get(msg);
         if (count != null) {
             errors.put(msg, Integer.valueOf(count + 1));
@@ -3192,31 +3144,6 @@ public class CFFDump
     {
         return errors.size();
     }
-
-    /*
-    private String dictTypeToString(int type)
-    {
-        switch (type) {
-            case DICT_TYPE_TOP:
-                return "Top DICT";
-            case DICT_TYPE_FD:
-                return "FD DICT";
-            case DICT_TYPE_PRIVATE:
-                return "Private DICT";
-            default:
-                return "?";
-        }
-    }
-
-    private void needsDictType(int allowedTypes, int type, String key, StringBuilder s)
-    {
-        if ((type & allowedTypes) == 0) {
-            String msg = "Entry " + key + " not allowed in " + dictTypeToString(type);
-            s.append("  % ERROR! ").append(msg);
-            addError(msg);
-        }
-    }
-    */
 
     private static int getLengthAsString(int value)
     {
@@ -3287,5 +3214,32 @@ public class CFFDump
     public void setLongFormat(boolean b)
     {
         isLongFormat = b;
+    }
+
+    /**
+     * Enable explanations of mask bits of operators hintmask and cntrmask.
+     */
+    public void setExplainHintMaskBits(boolean doExplainHintMaskBits)
+    {
+        type2Dumper.setExplainHintMaskBits(doExplainHintMaskBits);
+    }
+
+    /**
+     * Enable dumping subroutines that are never called.
+     */
+    public void setEnableDumpingUnusedSubroutines(boolean enable)
+    {
+        enableDumpingUnusedSubrs = enable;
+    }
+
+    int getGlobalSubrBias()
+    {
+        return globalSubrBias;
+    }
+
+    int getLocalSubrBias(int fdIdx)
+    {
+        int count = localSubrCounts[fdIdx];
+        return computeSubrBias(count);
     }
 }

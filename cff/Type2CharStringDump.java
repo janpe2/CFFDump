@@ -1,4 +1,4 @@
-/* Copyright 2021 Jani Pehkonen
+/* Copyright 2025 Jani Pehkonen
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,6 +38,14 @@ class Type2CharStringDump
      * {@code return} operator.
      */
     static final int CHARSTRING_END_RETURN = 2;
+
+    /**
+     * Return value for charstring parsing: dump of an unused subroutine was interrupted
+     * because {@code hintmask} or {@code cntrmask} was encountered.
+     */
+    static final int CHARSTRING_END_HINTMASK = 3;
+
+    static final String INVALID_NUM_OPERANDS_TEXT = "Invalid number of operands";
 
     /**
      * Names for one-byte Type2 operators.
@@ -88,6 +96,8 @@ class Type2CharStringDump
     boolean containsSeacs;
     boolean containsFlex;
     private float[] transientArray = null; // initialized on first use
+    private boolean doExplainHintMaskBits;
+    boolean unusedSubrDumpInterruptedByHintmask;
 
     Type2CharStringDump(CFFDump cffDump, ByteBuffer input)
     {
@@ -97,9 +107,8 @@ class Type2CharStringDump
 
     /**
      * Executes a Type2 charstring operator.
-     * Returns true when operators {@code endchar} or {@code return} end a charstring.
      */
-    private int type2Operator(int op, StringBuilder s, GlyphStatus gs)
+    private int type2Operator(int op, StringBuilder s, GlyphStatus gs, boolean isDumpingUnusedSubr)
     throws CFFParseException
     {
         boolean doClear = true;
@@ -184,12 +193,19 @@ class Type2CharStringDump
 
             case 10: { // callsubr
                 // doClear = false;
-                int subrNoUnbiased = t2PopInt();
-                gs.subrLevel++;
-                int ret = cffDump.executeLocalSubr(subrNoUnbiased, s, gs);
-                gs.subrLevel--;
-                gs.ensureWidthIsPrinted(s);
-                return ret;
+                int subrNo = t2PopInt();
+                if (isDumpingUnusedSubr) {
+                    int bias = cffDump.getLocalSubrBias(gs.fdIndex);
+                    s.append(opName).append("  % subr# ").append(subrNo + bias).append('\n');
+                    clearType2Stack();
+                    return CHARSTRING_END_CONTINUE;
+                } else {
+                    gs.subrLevel++;
+                    int ret = cffDump.executeLocalSubr(subrNo, s, gs, false, null);
+                    gs.subrLevel--;
+                    gs.ensureWidthIsPrinted(s);
+                    return ret;
+                }
             }
 
             case 11: // return
@@ -223,8 +239,15 @@ class Type2CharStringDump
             case 19:   // hintmask
             case 20: { // cntrmask
                 // hintmask and cntrmask may take vstem values and glyph width as operands.
+                int numVstems = type2StackCount / 2;
+                gs.stemHintCount += numVstems;
                 s.append(opName).append(' ');
-                gs.stemHintCount += type2StackCount / 2;
+                if (isDumpingUnusedSubr) {
+                    s.append("...\n    % <Cannot dump further because ").append(opName)
+                        .append(" was encountered in an unused subroutine>\n");
+                    unusedSubrDumpInterruptedByHintmask = true;
+                    return CHARSTRING_END_HINTMASK;
+                }
                 if (gs.stemHintCount == 0) {
                     String errorMsg = "No stem hints exist for " + opName;
                     s.append("  % ERROR! ").append(errorMsg).append(' ');
@@ -232,8 +255,10 @@ class Type2CharStringDump
                 } else {
                     // Mask bit bytes follow the operator. They are "raw" bytes that
                     // are not in Type 2 encoded format.
-                    int numBytesFollow = (gs.stemHintCount + 7) / 8; // 1 bit per stem hint
-                    readHintMaskBytes(numBytesFollow, s);
+                    String vstemsStr = numVstems > 0
+                        ? " % adds " + numVstems + " vstems "
+                        : "";
+                    readHintMaskBytes(gs.stemHintCount, s,  vstemsStr);
                 }
                 if (!gs.foundGlyphWidth) {
                     if ((type2StackCount % 2) == 1) {
@@ -308,12 +333,19 @@ class Type2CharStringDump
             case 29: {
                 // callgsubr
                 // doClear = false;
-                int subrNoUnbiased = t2PopInt();
-                gs.subrLevel++;
-                int ret = cffDump.executeGlobalSubr(subrNoUnbiased, s, gs);
-                gs.subrLevel--;
-                gs.ensureWidthIsPrinted(s);
-                return ret;
+                int subrNo = t2PopInt();
+                if (isDumpingUnusedSubr) {
+                    int bias = cffDump.getGlobalSubrBias();
+                    s.append(opName).append("  % gsubr# ").append(subrNo + bias).append('\n');
+                    clearType2Stack();
+                    return CHARSTRING_END_CONTINUE;
+                } else {
+                    gs.subrLevel++;
+                    int ret = cffDump.executeGlobalSubr(subrNo, s, gs, false, null);
+                    gs.subrLevel--;
+                    gs.ensureWidthIsPrinted(s);
+                    return ret;
+                }
             }
 
             case 30: // vhcurveto
@@ -748,7 +780,7 @@ class Type2CharStringDump
      * limits, we would read charstrings way too far before we encounter an
      * {@code endchar} that actually belongs to some other glyph.
      */
-    int executeCharString(StringBuilder s, GlyphStatus gs, int endOffset, boolean isSubr)
+    int executeCharString(StringBuilder s, GlyphStatus gs, int endOffset, boolean isDumpingUnusedSubr)
     throws CFFParseException
     {
         // When charstrings are dumped, this method truly processes the operands of all
@@ -810,7 +842,7 @@ class Type2CharStringDump
                 s.append(' ');
             } else {
                 // Commands {@code endchar} and {@code return} finish this charstring analysis
-                int ret = type2Operator(b, s, gs);
+                int ret = type2Operator(b, s, gs, isDumpingUnusedSubr);
                 if (ret != CHARSTRING_END_CONTINUE) {
                     returnValue = ret;
                     break;
@@ -819,7 +851,7 @@ class Type2CharStringDump
             }
         }
 
-        if (input.position() != endOffset) {
+        if (input.position() != endOffset && !isDumpingUnusedSubr) {
             s.append("    % ERROR: Invalid charstring end offset (reading ended at ").
                 append(input.position()).append(" but INDEX specifies end at ").
                 append(endOffset).append(")\n");
@@ -877,11 +909,39 @@ class Type2CharStringDump
         t2Push(num);
     }
 
-    private void readHintMaskBytes(int numBytes, StringBuilder s)
+    private void readHintMaskBytes(int numStemHints, StringBuilder s, String vstemsStr)
     {
-        for (int i = 0; i < numBytes; i++) {
-            int b = input.get() & 0xFF;
-            s.append("0x").append(Integer.toHexString(b).toUpperCase()).append(' ');
+        int bitCounter = -1;
+        int currentByte = 0;
+        String activeHints =   "\n    % --> Active hints #:   ";
+        String inactiveHints = "\n    %     Inactive hints #: ";
+
+        for (int i = 0; i < numStemHints; i++) {
+            if (bitCounter < 0) {
+                if (input.position() >= input.limit()) {
+                    return;
+                }
+                currentByte = input.get() & 0xFF;
+                bitCounter = 7;
+                String hex = Integer.toHexString(currentByte).toUpperCase();
+                s.append("0x").append(hex.length() < 2 ? "0" : "").append(hex).append(' ');
+            }
+            if (doExplainHintMaskBits) {
+                int bit = currentByte & (1 << bitCounter);
+                boolean isActive = bit != 0;
+                int hintNumber = i + 1;
+                if (isActive) {
+                    activeHints = activeHints + hintNumber + " ";
+                } else {
+                    inactiveHints = inactiveHints + hintNumber + " ";
+                }
+            }
+            bitCounter--;
+        }
+
+        s.append(vstemsStr);
+        if (doExplainHintMaskBits) {
+            s.append(activeHints).append(inactiveHints);
         }
     }
 
@@ -890,8 +950,12 @@ class Type2CharStringDump
         if (s.length() > 0 && s.charAt(s.length() - 1) == '\n') {
             s.setLength(s.length() - 1);
         }
-        s.append("  % ERROR! Invalid number of operands\n");
-        cffDump.addError("Invalid number of operands for " + op);
+        s.append("  % ERROR! ").append(INVALID_NUM_OPERANDS_TEXT).append('\n');
+        cffDump.addError(INVALID_NUM_OPERANDS_TEXT + " for " + op);
     }
 
+    void setExplainHintMaskBits(boolean doExplainHintMaskBits)
+    {
+        this.doExplainHintMaskBits = doExplainHintMaskBits;
+    }
 }

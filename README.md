@@ -1,7 +1,7 @@
 # CFFDump
-CFFDump dumps the contents of CFF (Compact Font Format) data in ASCII form.
+CFFDump dumps the contents of CFF (Compact Font Format) and Type1 font data in ASCII form.
 
-See an example of [dump output](cff-test-data/simple-dump.txt).
+See an example of [CFF dump output](cff-test-data/simple-dump.txt).
 
 ## Run
 

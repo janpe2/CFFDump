@@ -30,6 +30,7 @@ class GlyphStatus
     boolean widthWasPrinted = false;
     private String widthString;
     private CFFDump cffDump;
+    boolean isUnusedSubr = false;
 
     GlyphStatus(int gid, int fdIndex, CFFDump cffDump)
     {
@@ -40,6 +41,9 @@ class GlyphStatus
 
     void setGlyphWidth(float w, StringBuilder s)
     {
+        if (isUnusedSubr) {
+            return;
+        }
         float nomWidthX = cffDump.nominalWidths[fdIndex];
         float actualWidth = w + nomWidthX;
         this.width = actualWidth;
@@ -58,6 +62,9 @@ class GlyphStatus
 
     void setDefaultWidth(StringBuilder s)
     {
+        if (isUnusedSubr) {
+            return;
+        }
         float defaultWidthX = cffDump.defaultWidths[fdIndex];
         this.width = defaultWidthX;
         this.foundGlyphWidth = true;
@@ -74,7 +81,7 @@ class GlyphStatus
 
     void checkWidthFound(StringBuilder s, String op)
     {
-        if (!foundGlyphWidth) {
+        if (!foundGlyphWidth && !isUnusedSubr) {
             if (s.length() > 0 && s.charAt(s.length() - 1) == '\n') {
                 s.setLength(s.length() - 1);
             }
@@ -91,7 +98,7 @@ class GlyphStatus
         // not a good idea to print the width in a subroutine dump because its value
         // may vary depending on which glyph called the subroutine.
 
-        if (!widthWasPrinted && subrLevel == 0 && widthString != null) {
+        if (!widthWasPrinted && subrLevel == 0 && widthString != null && !isUnusedSubr) {
             s.append("  ").append(widthString).append('\n');
             widthWasPrinted = true;
         }
