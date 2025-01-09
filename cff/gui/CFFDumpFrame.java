@@ -1,4 +1,4 @@
-/* Copyright 2021 Jani Pehkonen
+/* Copyright 2025 Jani Pehkonen
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.io.File;
 import javax.swing.BorderFactory;
+import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
@@ -32,6 +33,7 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
@@ -46,17 +48,22 @@ public class CFFDumpFrame extends JFrame implements ActionListener
     private JButton buttonStart;
     private JButton buttonAbout;
     private JButton buttonExit;
-    private final JButton buttonChooseFile;
-    private final JCheckBox checkBoxAnalyzeCharstrings;
-    private final JComboBox comboInputType;
-    private final JComboBox comboFilter;
-    private final JTextField textFieldOffset;
-    private final JTextField textFieldFile;
-    private final JTextArea textAreaOutput;
+    private JButton buttonClearOutput;
+    private JButton buttonChooseFile;
+    private JCheckBox checkBoxAnalyzeCharstrings;
+    private JCheckBox checkBoxExplainHintMaskBits;
+    private JCheckBox checkBoxDumpUnusedSubrs;
+    private JComboBox comboFilter;
+    private JTextField textFieldOffset;
+    private JTextField textFieldFile;
+    private JTextArea textAreaOutput;
+    private JRadioButton radioFileRawCFF;
+    private JRadioButton radioFileCFFPDF;
+    private JRadioButton radioFileOTF;
+    private JRadioButton radioFileType1PDF;
+    private JRadioButton radioFileRawType1;
     private File lastUsedDirectory;
-
-    private static final String INPUT_TYPE_PDF_OR_RAW = "PDF or Raw CFF File";
-    private static final String INPUT_TYPE_OTF = "OpenType Font File";
+    private String fontType = "cff";
 
     private static final String FILTER_NONE = "None";
     private static final String FILTER_FLATE = "/FlateDecode";
@@ -64,65 +71,37 @@ public class CFFDumpFrame extends JFrame implements ActionListener
     private static final String FILTER_A85_FLATE = "[ /ASCII85Decode /FlateDecode ]";
     private static final String FILTER_HEX = "/ASCIIHexDecode";
 
-    public CFFDumpFrame()
+    private static final String COPYRIGHT_YEAR = "2025";
+
+    public CFFDumpFrame(String fontFile)
     {
         super("CFFDump");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         getRootPane().setBorder(BorderFactory.createEmptyBorder(7, 7, 7, 7));
         setLayout(new GridBagLayout());
 
-        GridBagConstraints gc = new GridBagConstraints(0, GridBagConstraints.RELATIVE,
-            1, 1, 0.0, 0.0, GridBagConstraints.FIRST_LINE_START,
-            GridBagConstraints.HORIZONTAL, new Insets(2, 5, 2, 5), 0, 0);
-        buttonChooseFile = new JButton("Input File:");
-        buttonChooseFile.addActionListener(this);
-        add(buttonChooseFile, gc);
-
-        gc = new GridBagConstraints(1, GridBagConstraints.RELATIVE,
-            1, 1, 1.0, 0.0, GridBagConstraints.FIRST_LINE_START,
-            GridBagConstraints.HORIZONTAL, new Insets(2, 5, 2, 5), 0, 0);
-        textFieldFile = new JTextField("", 50);
-        add(textFieldFile, gc);
-
-        gc = new GridBagConstraints(0, GridBagConstraints.RELATIVE,
+        GridBagConstraints gc = new GridBagConstraints(0, 0,
             2, 1, 1.0, 0.0, GridBagConstraints.FIRST_LINE_START,
             GridBagConstraints.HORIZONTAL, new Insets(2, 5, 2, 5), 0, 0);
-        add(new JLabel("Input File Type:"), gc);
-        comboInputType = new JComboBox(
-            new String[] {
-                INPUT_TYPE_PDF_OR_RAW,
-                INPUT_TYPE_OTF
-            }
-        );
-        comboInputType.addActionListener(this);
-        add(comboInputType, gc);
+        add(createFilePanel(fontFile), gc);
 
-        add(new JLabel("PDF Data Filter:"), gc);
-        comboFilter = new JComboBox(
-            new String[] {
-                FILTER_NONE,
-                FILTER_FLATE,
-                FILTER_A85,
-                FILTER_A85_FLATE,
-                FILTER_HEX
-            }
-        );
-        add(comboFilter, gc);
-
-        add(new JLabel("Data Start Offset:"), gc);
-        textFieldOffset = new JTextField("0", 20);
-        add(textFieldOffset, gc);
-
-        checkBoxAnalyzeCharstrings = new JCheckBox("Analyze CharStrings and Subroutines", true);
-        add(checkBoxAnalyzeCharstrings, gc);
-
-        gc = new GridBagConstraints(0, GridBagConstraints.RELATIVE,
-            2, 1, 1.0, 0.0, GridBagConstraints.FIRST_LINE_START,
+        gc = new GridBagConstraints(0, 1,
+            1, 1, 0.5, 0.0, GridBagConstraints.FIRST_LINE_START,
             GridBagConstraints.HORIZONTAL, new Insets(2, 5, 2, 5), 0, 0);
+        add(createFileTypeRadioGroup(), gc);
+
+        gc = new GridBagConstraints(1, 1,
+            1, 1, 0.5, 0.0, GridBagConstraints.FIRST_LINE_START,
+            GridBagConstraints.HORIZONTAL, new Insets(2, 5, 2, 5), 0, 0);
+        add(createRightPanel(), gc);
+
+        gc = new GridBagConstraints(0, 2,
+            2, 1, 1.0, 0.0, GridBagConstraints.FIRST_LINE_START,
+            GridBagConstraints.HORIZONTAL, new Insets(8, 5, 8, 5), 0, 0);
         JPanel buttonPanel = createButtonPanel();
         add(buttonPanel, gc);
 
-        gc = new GridBagConstraints(0, GridBagConstraints.RELATIVE,
+        gc = new GridBagConstraints(0, 3,
             2, 1, 1.0, 1.0, GridBagConstraints.FIRST_LINE_START,
             GridBagConstraints.BOTH, new Insets(5, 5, 5, 5), 0, 0);
         textAreaOutput = new JTextArea();
@@ -135,12 +114,99 @@ public class CFFDumpFrame extends JFrame implements ActionListener
         pack();
     }
 
-    public static void main(String[] args)
+    private JPanel createFilePanel(String fontFile)
     {
-        launchGUI();
+        JPanel panel = new JPanel();
+        panel.setLayout(new GridBagLayout());
+        GridBagConstraints gc = new GridBagConstraints(0, GridBagConstraints.RELATIVE,
+            1, 1, 0.0, 0.0, GridBagConstraints.FIRST_LINE_START,
+            GridBagConstraints.HORIZONTAL, new Insets(2, 5, 2, 5), 0, 0);
+
+        buttonChooseFile = new JButton("Input File:");
+        buttonChooseFile.addActionListener(this);
+        panel.add(buttonChooseFile, gc);
+
+        gc = new GridBagConstraints(1, GridBagConstraints.RELATIVE,
+            1, 1, 1.0, 0.0, GridBagConstraints.FIRST_LINE_START,
+            GridBagConstraints.HORIZONTAL, new Insets(2, 5, 2, 5), 0, 0);
+        textFieldFile = new JTextField(fontFile != null ? fontFile : "", 50);
+        panel.add(textFieldFile, gc);
+
+        return panel;
     }
 
-    public static void launchGUI()
+    private JPanel createRightPanel()
+    {
+        JPanel panel = new JPanel();
+        panel.setLayout(new GridBagLayout());
+        GridBagConstraints gc = new GridBagConstraints(0, GridBagConstraints.RELATIVE,
+            1, 1, 0.0, 0.0, GridBagConstraints.FIRST_LINE_START,
+            GridBagConstraints.HORIZONTAL, new Insets(1, 0, 2, 0), 0, 0);
+
+        panel.add(new JLabel("PDF Data Filter:"), gc);
+        comboFilter = new JComboBox(
+            new String[] {
+                FILTER_NONE,
+                FILTER_FLATE,
+                FILTER_A85,
+                FILTER_A85_FLATE,
+                FILTER_HEX
+            }
+        );
+        panel.add(comboFilter, gc);
+
+        panel.add(new JLabel("Data Start Offset:"), gc);
+        textFieldOffset = new JTextField("0", 20);
+        panel.add(textFieldOffset, gc);
+
+        checkBoxAnalyzeCharstrings = new JCheckBox("Analyze CharStrings and Subroutines", true);
+        panel.add(checkBoxAnalyzeCharstrings, gc);
+        checkBoxExplainHintMaskBits = new JCheckBox("Explain Mask Bits of CFF 'hintmask'", false);
+        panel.add(checkBoxExplainHintMaskBits, gc);
+        checkBoxDumpUnusedSubrs = new JCheckBox("Dump Unused Subroutines in CFF", false);
+        panel.add(checkBoxDumpUnusedSubrs, gc);
+
+        comboFilter.setEnabled(false);
+        textFieldOffset.setEnabled(false);
+
+        return panel;
+    }
+
+    private JPanel createFileTypeRadioGroup()
+    {
+        JPanel panel = new JPanel();
+        panel.setLayout(new GridBagLayout());
+        GridBagConstraints gc = new GridBagConstraints(0, GridBagConstraints.RELATIVE,
+            1, 1, 0.0, 0.0, GridBagConstraints.FIRST_LINE_START,
+            GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0);
+        panel.setBorder(BorderFactory.createTitledBorder("Input File Type"));
+        ButtonGroup group = new ButtonGroup();
+
+        radioFileRawCFF = getRadioButton("Raw CFF", true, group, panel, gc);
+        radioFileCFFPDF = getRadioButton("CFF Embedded in PDF", false, group, panel, gc);
+        radioFileOTF = getRadioButton("OpenType CFF", false, group, panel, gc);
+        radioFileType1PDF = getRadioButton("Type1 Embedded in PDF", false, group, panel, gc);
+        radioFileRawType1 = getRadioButton("Type1 Raw, PFA, or PFB", false, group, panel, gc);
+
+        return panel;
+    }
+
+    private JRadioButton getRadioButton(String text, boolean selected, ButtonGroup group,
+    JPanel panel, GridBagConstraints gc)
+    {
+        JRadioButton button = new JRadioButton(text, selected);
+        group.add(button);
+        panel.add(button, gc);
+        button.addActionListener(this);
+        return button;
+    }
+
+    public static void main(String[] args)
+    {
+        launchGUI(null);
+    }
+
+    public static void launchGUI(final String fontFile)
     {
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
@@ -150,7 +216,7 @@ public class CFFDumpFrame extends JFrame implements ActionListener
         EventQueue.invokeLater(new Runnable() {
             @Override
             public void run() {
-                new CFFDumpFrame().setVisible(true);
+                new CFFDumpFrame(fontFile).setVisible(true);
             }
         });
     }
@@ -172,18 +238,39 @@ public class CFFDumpFrame extends JFrame implements ActionListener
                 textFieldFile.setText(dialog.getSelectedFile().toString());
             }
 
-        } else if (source == comboInputType) {
-            Object item = comboInputType.getSelectedItem();
-            boolean isPDFOrRaw = INPUT_TYPE_PDF_OR_RAW.equals(item);
-            comboFilter.setEnabled(isPDFOrRaw);
-            textFieldOffset.setEnabled(isPDFOrRaw);
-
         } else if (source == buttonExit) {
             System.exit(0);
+
+        } else if (source == buttonClearOutput) {
+            textAreaOutput.setText("");
 
         } else if (source == buttonAbout) {
             showAbout();
 
+        } else if (source == radioFileRawCFF) {
+            fontType = "cff";
+            textFieldOffset.setEnabled(false);
+            comboFilter.setEnabled(false);
+
+        } else if (source == radioFileCFFPDF) {
+            fontType = "cff";
+            textFieldOffset.setEnabled(true);
+            comboFilter.setEnabled(true);
+
+        } else if (source == radioFileOTF) {
+            fontType = "cff";
+            textFieldOffset.setEnabled(false);
+            comboFilter.setEnabled(false);
+
+        } else if (source == radioFileType1PDF) {
+            fontType = "type1";
+            textFieldOffset.setEnabled(true);
+            comboFilter.setEnabled(true);
+
+        } else if (source == radioFileRawType1) {
+            fontType = "type1";
+            textFieldOffset.setEnabled(false);
+            comboFilter.setEnabled(false);
         }
     }
 
@@ -194,14 +281,20 @@ public class CFFDumpFrame extends JFrame implements ActionListener
                 throw new Exception("Please choose an input file.");
             }
 
-            Object fileType = comboInputType.getSelectedItem();
-            String offset = INPUT_TYPE_PDF_OR_RAW.equals(fileType) ? textFieldOffset.getText() : "0";
+            String offset = textFieldOffset.isEnabled() ? textFieldOffset.getText() : "0";
+            offset = "".equals(offset) ? "0" : offset;
+            boolean isOTF = radioFileOTF.isSelected();
 
             CFFDumpDataHandler handler = new CFFDumpDataHandler(
                 new File(textFieldFile.getText()),
-                INPUT_TYPE_OTF.equals(fileType),
+                fontType,
+                isOTF,
                 getFilter(),
-                offset, checkBoxAnalyzeCharstrings.isSelected());
+                offset,
+                checkBoxAnalyzeCharstrings.isSelected(),
+                checkBoxExplainHintMaskBits.isSelected(),
+                checkBoxDumpUnusedSubrs.isSelected()
+            );
             CFFDumpDataHandler.DumpResult result = handler.analyze();
             textAreaOutput.setText(result.dump);
             textAreaOutput.setCaretPosition(0);
@@ -249,6 +342,10 @@ public class CFFDumpFrame extends JFrame implements ActionListener
         buttonPanel.add(buttonStart);
         buttonStart.addActionListener(this);
 
+        buttonClearOutput = new JButton("Clear");
+        buttonPanel.add(buttonClearOutput);
+        buttonClearOutput.addActionListener(this);
+
         buttonAbout = new JButton("About");
         buttonPanel.add(buttonAbout);
         buttonAbout.addActionListener(this);
@@ -264,7 +361,7 @@ public class CFFDumpFrame extends JFrame implements ActionListener
     {
         String text =
             "CFFDump " + DUMPER_VERSION + "\n" +
-            "Copyright 2024 Jani Pehkonen\n" +
+            "Copyright " + COPYRIGHT_YEAR + " Jani Pehkonen\n" +
             "Licensed under the Apache License, Version 2.0 (the \"License\");\n" +
             "you may not use this file except in compliance with the License.\n" +
             "You may obtain a copy of the License at\n" +

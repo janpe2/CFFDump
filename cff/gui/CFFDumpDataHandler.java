@@ -1,4 +1,4 @@
-/* Copyright 2021 Jani Pehkonen
+/* Copyright 2025 Jani Pehkonen
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.zip.InflaterInputStream;
 import cff.CFFDump;
 import cff.io.ASCII85DecoderStream;
+import cff.type1.Type1Dump;
 
 public class CFFDumpDataHandler
 {
@@ -36,23 +37,74 @@ public class CFFDumpDataHandler
     }
 
     private final File file;
+    private final String fontType;
     private final boolean isOTF;
     private final PDFFilter filter;
     private final int fileOffset;
     private final boolean analyzeCharstrings;
+    private final boolean explainHintMaskBits;
+    private final boolean dumpUnusedSubrs;
 
-    CFFDumpDataHandler(File file, boolean isOTF, PDFFilter filter, String fileOffset,
-    boolean analyzeCharstrings)
+    CFFDumpDataHandler(File file, String fontType, boolean isOTF, PDFFilter filter,
+    String fileOffset, boolean analyzeCharstrings, boolean explainHintMaskBits,
+    boolean dumpUnusedSubrs)
     throws NumberFormatException
     {
         this.file = file;
+        this.fontType = fontType;
         this.isOTF = isOTF;
         this.filter = filter;
         this.fileOffset = Integer.parseInt(fileOffset);
         this.analyzeCharstrings = analyzeCharstrings;
+        this.explainHintMaskBits = explainHintMaskBits;
+        this.dumpUnusedSubrs = dumpUnusedSubrs;
     }
 
     DumpResult analyze() throws IOException
+    {
+        if ("type1".equals(fontType)) {
+            return analyzeType1();
+        } else {
+            return analyzeCFF();
+        }
+    }
+
+    private DumpResult analyzeType1() throws IOException
+    {
+        Type1Dump type1Dump;
+        InputStream is = null;
+
+        try {
+            is = new FileInputStream(file);
+            if (fileOffset > 0) {
+                is.skip(fileOffset);
+            }
+            is = applyFilters(is);
+            type1Dump = new Type1Dump(is, file, fileOffset);
+            type1Dump.enableDumpingCharstringsAndSubrs(analyzeCharstrings);
+            String dump = "";
+
+            try {
+                type1Dump.parseFont();
+                dump = type1Dump.getResult();
+                String specialFeatures = type1Dump.getSpecialFeatures();
+                if (specialFeatures != null) {
+                    dump = dump + "\n\n" + specialFeatures;
+                }
+            } catch (Exception ex) {
+                dump += "\nException: " + ex + "\n";
+            }
+
+            return new DumpResult(dump, type1Dump.hasErrors());
+
+        } finally {
+            if (is != null) {
+                is.close();
+            }
+        }
+    }
+
+    private DumpResult analyzeCFF() throws IOException
     {
         CFFDump cffDump;
         InputStream is = null;
@@ -76,6 +128,8 @@ public class CFFDumpDataHandler
             }
 
             cffDump.enableDumpingCharstringsAndSubrs(analyzeCharstrings);
+            cffDump.setExplainHintMaskBits(explainHintMaskBits);
+            cffDump.setEnableDumpingUnusedSubroutines(dumpUnusedSubrs);
             String dump = "";
 
             try {
@@ -108,7 +162,8 @@ public class CFFDumpDataHandler
             case FLATE:
                 return new InflaterInputStream(is);
             case ASCII85_FLATE:
-                return new InflaterInputStream(new ASCII85DecoderStream(is));
+                is = new ASCII85DecoderStream(is);
+                return new InflaterInputStream(is);
             case ASCIIHEX:
                 byte[] bytes = CFFDump.hexToBytes(is);
                 return new ByteArrayInputStream(bytes);
