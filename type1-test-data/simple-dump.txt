@@ -1,0 +1,246 @@
+% Type1 Dump Output
+% File: simple.type1
+
+-------------------------------------------------------------------
+
+FontMatrix:
+    [0.001 0 0 0.001 0 0 ]
+
+
+-------------------------------------------------------------------
+
+FontInfo:
+  version: (001.000)
+  Notice: (Copyright \050c\051 2024, Jani Pehkonen)
+  FullName: (Soncolas)
+  FamilyName: (Soncolas)
+  Weight: (Regular)
+  ItalicAngle: 0
+  isFixedPitch: true
+  UnderlinePosition: -100
+  UnderlineThickness: 50
+
+
+-------------------------------------------------------------------
+
+Encoding:
+    StandardEncoding
+
+-------------------------------------------------------------------
+
+Subroutines (Subrs):
+
+[0]:
+    3 0 callothersubr  % End of flex
+    pop
+    pop
+    setcurrentpoint
+    return
+
+[1]:
+    0 1 callothersubr  % Flex begins
+    return
+
+[2]:
+    0 2 callothersubr  % Add flex point
+    return
+
+[3]:
+    return
+
+[4]:
+    1 3 callothersubr  % Hint replacement
+    pop
+    callsubr
+    return
+
+[5]:
+    -12 67 hstem
+    422 70 hstem
+    350 72 vstem
+    return
+
+[6]:
+    21 -21 hstem
+    422 70 hstem
+    350 72 vstem
+    return
+
+[7]:
+    -12 67 hstem
+    422 70 hstem
+    5 152 vstem
+    333 84 vstem
+    return
+
+[8]:
+    -12 67 hstem
+    422 70 hstem
+    0 92 vstem
+    350 72 vstem
+    return
+
+[9]:
+    -12 67 hstem
+    422 70 hstem
+    0 92 vstem
+    333 84 vstem
+    return
+
+[10]:
+    0 70 hstem
+    410 70 hstem
+    577 130 hstem
+    76 152 vstem
+    return
+
+[11]:
+    0 70 hstem
+    410 70 hstem
+    577 130 hstem
+    117 84 vstem
+    return
+
+
+-------------------------------------------------------------------
+
+CharStrings:
+
+/.notdef:
+    0 600 hsbw  % glyph width = 600
+    endchar
+
+/a:
+    79 600 hsbw  % glyph width = 600
+    5 4 callsubr
+    172 -12 rmoveto
+    63 0 62 17 42 37 rrcurveto
+    6 4 callsubr
+    11 -42 rlineto
+    72 hlineto
+    7 4 callsubr
+    -5 51 rlineto
+    230 vlineto
+    118 -76 93 -150 vhcurveto
+    -108 -78 -44 -60 hvcurveto
+    -42 35 -22 43 vhcurveto
+    39 35 26 38 hvcurveto
+    0 9 -1 10 -6 10 rrcurveto
+    12 3 18 2 15 0 rrcurveto
+    73 0 51 -46 14 -77 rrcurveto
+    8 4 callsubr
+    -171 -29 -162 -28 0 -129 rrcurveto
+    5 4 callsubr
+    -73 67 -52 105 vhcurveto
+    closepath
+    25 67 rmoveto
+    -52 -53 19 45 hvcurveto
+    9 4 callsubr
+    0 79 143 20 98 14 rrcurveto
+    -123 vlineto
+    -38 -33 -42 -21 -56 0 rrcurveto
+    closepath
+    endchar
+
+/f:
+    110 600 hsbw  % glyph width = 600
+    0 70 hstem
+    410 70 hstem
+    667 70 hstem
+    78 90 vstem
+    283 152 vstem
+    0 vmoveto
+    294 hlineto
+    70 vlineto
+    -126 hlineto
+    340 vlineto
+    126 hlineto
+    70 vlineto
+    -126 hlineto
+    33 vlineto
+    77 9 77 73 vhcurveto
+    17 0 16 -5 10 -10 rrcurveto
+    -7 -10 -3 -13 0 -11 rrcurveto
+    -38 35 -26 39 vhcurveto
+    43 35 22 42 hvcurveto
+    60 -71 59 -108 vhcurveto
+    -138 -40 -100 -118 hvcurveto
+    -39 vlineto
+    -78 hlineto
+    -70 vlineto
+    78 hlineto
+    -340 vlineto
+    -78 hlineto
+    closepath
+    endchar
+
+/i:
+    148 600 hsbw  % glyph width = 600
+    10 4 callsubr
+    152 577 rmoveto
+    46 30 29 36 hvcurveto
+    36 -30 29 -46 vhcurveto
+    -46 -30 -29 -36 hvcurveto
+    -36 30 -29 46 vhcurveto
+    closepath
+    -152 -577 rmoveto
+    318 hlineto
+    70 vlineto
+    11 4 callsubr
+    -117 hlineto
+    410 vlineto
+    -201 hlineto
+    -70 vlineto
+    117 hlineto
+    -340 vlineto
+    -117 hlineto
+    closepath
+    endchar
+
+/o:
+    62 600 hsbw  % glyph width = 600
+    -12 70 hstem
+    422 70 hstem
+    0 92 vstem
+    384 92 vstem
+    238 58 rmoveto
+    -92 -54 85 97 hvcurveto
+    97 54 85 92 vhcurveto
+    92 54 -85 -97 hvcurveto
+    -97 -54 -85 -92 vhcurveto
+    closepath
+    -70 vmoveto
+    147 91 113 139 hvcurveto
+    139 -91 113 -147 vhcurveto
+    -147 -91 -113 -139 hvcurveto
+    -139 91 -113 147 vhcurveto
+    closepath
+    endchar
+
+
+-------------------------------------------------------------------
+
+Other Dictionary Entries:
+  FontName: /Soncolas-Regular
+  FontBBox: {62 -12 545 737 }
+  PaintType: 0
+
+
+
+-------------------------------------------------------------------
+
+Private Dictionary Entries:
+  BlueValues: [-12 0 480 492 725 737]
+  StdHW: [70]
+  StdVW: [84]
+
+
+
+-------------------------------------------------------------------
+
+Summary:
+  5 entries in CharStrings.
+  12 subroutines in Subrs array.
+  Encoding is StandardEncoding.
+
+
