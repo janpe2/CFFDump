@@ -103,7 +103,7 @@ public class CFFDump
     private boolean silenceNumOperandsErrorsInUnusedSubr;
     private boolean hasAnyNumOperandsErrorsInUnusedSubrs;
 
-    public static final String DUMPER_VERSION = "2.0.0";
+    public static final String DUMPER_VERSION = "2.1.0";
 
     /**
      * The contents of the String INDEX, the non-standard strings.
@@ -615,7 +615,7 @@ public class CFFDump
      *
      * @throws cff.CFFParseException if CFF data is invalid or contains unsupported operations
      */
-    public void parseCFF() throws CFFParseException
+    public void parseCFF() throws CFFParseException, FileFormatException
     {
         // Header
         printSectionHeading("Header", sbMain);
@@ -627,14 +627,11 @@ public class CFFDump
             throw new CFFParseException("CFF2 font is not supported");
         }
         if (major != 1) {
-            String message = "Unsupported CFF version " + major + "." + minor;
             if (input.capacity() >= 4) {
                 int fourBytes = (major << 24) | (minor << 16) | (readCard8() << 8) | readCard8();
-                if (fourBytes == OTF_OTTO) {
-                    message += ". This might be an OpenType font. Use -otf option.";
-                }
+                throw new FileFormatException(fourBytes);
             }
-            throw new CFFParseException(message);
+            throw new FileFormatException("Unsupported CFF version " + major + "." + minor);
         }
         int hdrSize = readCard8();
         sbMain.append("    hdrSize: ").append(hdrSize).append('\n');
@@ -2747,7 +2744,7 @@ public class CFFDump
             int sfntVersion = raf.readInt();
             // sfnt version must be "OTTO"
             if (sfntVersion != OTF_OTTO) {
-                throw new CFFParseException("This is not an OpenType-CFF file");
+                throw new FileFormatException(sfntVersion);
             }
 
             int numTables = raf.readUnsignedShort();

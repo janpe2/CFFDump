@@ -118,19 +118,24 @@ public class CFFDumpFrame extends JFrame implements ActionListener
     {
         JPanel panel = new JPanel();
         panel.setLayout(new GridBagLayout());
-        GridBagConstraints gc = new GridBagConstraints(0, GridBagConstraints.RELATIVE,
-            1, 1, 0.0, 0.0, GridBagConstraints.FIRST_LINE_START,
+        GridBagConstraints gc = new GridBagConstraints(0, 0,
+            1, 1, 0.0, 0.0, GridBagConstraints.CENTER,
             GridBagConstraints.HORIZONTAL, new Insets(2, 5, 2, 5), 0, 0);
 
-        buttonChooseFile = new JButton("Input File:");
-        buttonChooseFile.addActionListener(this);
-        panel.add(buttonChooseFile, gc);
+        panel.add(new JLabel("Input File:"), gc);
 
-        gc = new GridBagConstraints(1, GridBagConstraints.RELATIVE,
+        gc = new GridBagConstraints(1, 0,
             1, 1, 1.0, 0.0, GridBagConstraints.FIRST_LINE_START,
             GridBagConstraints.HORIZONTAL, new Insets(2, 5, 2, 5), 0, 0);
         textFieldFile = new JTextField(fontFile != null ? fontFile : "", 50);
         panel.add(textFieldFile, gc);
+
+        gc = new GridBagConstraints(2, 0,
+            1, 1, 0.0, 0.0, GridBagConstraints.CENTER,
+            GridBagConstraints.HORIZONTAL, new Insets(2, 5, 2, 5), 0, 0);
+        buttonChooseFile = new JButton("Browse");
+        buttonChooseFile.addActionListener(this);
+        panel.add(buttonChooseFile, gc);
 
         return panel;
     }

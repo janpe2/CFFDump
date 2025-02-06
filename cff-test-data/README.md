@@ -25,9 +25,6 @@ Invalid operator 9 appears repeatedly in charstrings. All numbers in charstrings
 Includes a flex section.
 
 `flex-and-hintmask.cff`
-Flex segments and hintmasks.
-
-`garamond-light.cff`
 Lots of hintmasks and flexes. Glyph 'g' has so many stem hints that the mask bits of hintmask require 2 bytes. Glyph 'm' has cntrmask. Glyph 'w' has hflex1. Glyph '1' has flex1.
 
 `global_subrs.cff`

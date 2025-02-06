@@ -20,6 +20,7 @@ import java.io.IOException;
 import cff.gui.CFFDumpFrame;
 import cff.io.Filters;
 import cff.type1.Type1Dump;
+import cff.FileFormatException;
 
 /**
  * CLI-related functions for CFF dumper.
@@ -127,41 +128,59 @@ public class CFFDumpCLI
         String dump;
         String errors = "";
 
-        if (isType1) {
-            Type1Dump dumper = new Type1Dump(new File(file), startOffset, filter);
-            dumper.enableDumpingCharstringsAndSubrs(enableCharstringsDump);
-            dumper.parseFont();
-            dump = dumper.getResult();
-            String specialFeatures = dumper.getSpecialFeatures();
-            if (specialFeatures != null) {
-                dump = dump + "\n\n" + specialFeatures;
-            }
-        } else {
-            CFFDump dumper;
-            if (isOpenType) {
-                dumper = CFFDump.createOTFDumper(new File(file));
+        try {
+            if (isType1) {
+                Type1Dump dumper = new Type1Dump(new File(file), startOffset, filter);
+                dumper.enableDumpingCharstringsAndSubrs(enableCharstringsDump);
+                dumper.parseFont();
+                dump = dumper.getResult();
+                String specialFeatures = dumper.getSpecialFeatures();
+                if (specialFeatures != null) {
+                    dump = dump + "\n\n" + specialFeatures;
+                }
             } else {
-                dumper = new CFFDump(new File(file), startOffset, filter);
-            }
+                CFFDump dumper;
+                if (isOpenType) {
+                    dumper = CFFDump.createOTFDumper(new File(file));
+                } else {
+                    dumper = new CFFDump(new File(file), startOffset, filter);
+                }
 
-            dumper.enableDumpingCharstringsAndSubrs(enableCharstringsDump);
-            dumper.enableDumpingOffsetArrays(enableOffsetsDump);
-            dumper.setLongFormat(isLongFormat);
-            dumper.setExplainHintMaskBits(explainHintMaskBits);
-            dumper.setEnableDumpingUnusedSubroutines(dumpUnusedSubrs);
-            if (singleGlyph != null) {
-                dumper.dumpOnlyOneCharstring(singleGlyph);
+                dumper.enableDumpingCharstringsAndSubrs(enableCharstringsDump);
+                dumper.enableDumpingOffsetArrays(enableOffsetsDump);
+                dumper.setLongFormat(isLongFormat);
+                dumper.setExplainHintMaskBits(explainHintMaskBits);
+                dumper.setEnableDumpingUnusedSubroutines(dumpUnusedSubrs);
+                if (singleGlyph != null) {
+                    dumper.dumpOnlyOneCharstring(singleGlyph);
+                }
+                dumper.parseCFF();
+                dump = dumper.getResult();
+                errors = dumper.hasErrors() ? dumper.getErrors() : "";
             }
-
-            dumper.parseCFF();
-            dump = dumper.getResult();
-            errors = dumper.hasErrors() ? dumper.getErrors() : "";
+        } catch (FileFormatException ex) {
+            printException(ex.getMessage());
+            System.exit(1);
+            return;
+        } catch (Exception ex) {
+            printException(ex.toString());
+            System.exit(1);
+            return;
         }
 
         if (errors != null && errors.length() > 0) {
             dump += "\nThere we errors:\n" + errors;
         }
         System.out.println(dump);
+    }
+
+    private static void printException(String message)
+    {
+        System.out.println();
+        System.out.println("Error:");
+        System.out.println(message);
+        System.out.println();
+        System.exit(1);
     }
 
     private static void printUsage(int exitStatus)

@@ -24,6 +24,7 @@ import java.util.zip.InflaterInputStream;
 import cff.CFFDump;
 import cff.io.ASCII85DecoderStream;
 import cff.type1.Type1Dump;
+import cff.FileFormatException;
 
 public class CFFDumpDataHandler
 {
@@ -91,6 +92,8 @@ public class CFFDumpDataHandler
                 if (specialFeatures != null) {
                     dump = dump + "\n\n" + specialFeatures;
                 }
+            } catch (FileFormatException ex) {
+                dump += "\n" + ex.getMessage();
             } catch (Exception ex) {
                 dump += "\nException: " + ex + "\n";
             }
@@ -135,6 +138,8 @@ public class CFFDumpDataHandler
             try {
                 cffDump.parseCFF();
                 dump = cffDump.getResult();
+            } catch (FileFormatException ex) {
+                dump += "\n" + ex.getMessage();
             } catch (Exception ex) {
                 dump += "\nException: " + ex + "\n";
                 // ex.printStackTrace();
